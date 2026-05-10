@@ -11,8 +11,8 @@ export function RequireAuth() {
   if (!isInitialized) {
     return (
       <div className="p-4 md:p-6 xl:p-8">
-        <Card className="p-6">
-          <div className="text-sm text-slate-500">Restoring your terminal session...</div>
+        <Card className="border-[#eadbcb] p-6">
+          <div className="text-sm text-[#7b685c]">Restoring your terminal session...</div>
         </Card>
       </div>
     );

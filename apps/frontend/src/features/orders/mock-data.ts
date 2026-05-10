@@ -11,6 +11,7 @@ export const mockProducts: MenuProduct[] = [
     category: "Coffee",
     imageUrl: "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=500&q=80",
     stockQuantity: 20,
+    lowStockThreshold: 8,
     tags: ["best seller", "hot"],
     isActive: true
   },
@@ -24,6 +25,7 @@ export const mockProducts: MenuProduct[] = [
     category: "Signature",
     imageUrl: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=500&q=80",
     stockQuantity: 18,
+    lowStockThreshold: 8,
     tags: ["signature", "iced"],
     isActive: true
   },
@@ -37,6 +39,7 @@ export const mockProducts: MenuProduct[] = [
     category: "Tea",
     imageUrl: "https://images.unsplash.com/photo-1515823662972-da6a2e4d3002?auto=format&fit=crop&w=500&q=80",
     stockQuantity: 14,
+    lowStockThreshold: 6,
     tags: ["new", "iced"],
     isActive: true
   },
@@ -50,6 +53,7 @@ export const mockProducts: MenuProduct[] = [
     category: "Pastries",
     imageUrl: "https://images.unsplash.com/photo-1555507036-ab794f4ade0a?auto=format&fit=crop&w=500&q=80",
     stockQuantity: 12,
+    lowStockThreshold: 6,
     tags: ["bakery"],
     isActive: true
   }

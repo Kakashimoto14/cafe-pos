@@ -20,6 +20,7 @@ const productSchema = z.object({
   description: z.string().min(8, "Add a more useful description."),
   price: z.coerce.number().min(1, "Price must be greater than zero."),
   stockQuantity: z.coerce.number().int().min(0, "Stock cannot be negative."),
+  lowStockThreshold: z.coerce.number().int().min(0, "Threshold cannot be negative."),
   imageUrl: z.union([z.string().url("Use a valid image URL."), z.literal("")]),
   isActive: z.boolean()
 });
@@ -46,6 +47,7 @@ const emptyProduct: ProductFormValues = {
   description: "",
   price: 0,
   stockQuantity: 0,
+  lowStockThreshold: 10,
   imageUrl: "",
   isActive: true
 };
@@ -144,68 +146,76 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Catalog control</div>
-          <h1 className="mt-3 font-display text-4xl text-slate-950">Products and categories</h1>
-          <p className="mt-3 max-w-2xl text-sm text-slate-500">
-            This workspace feeds the live POS grid, order flow, and revenue reporting.
-          </p>
-        </div>
-
-        {canEdit ? (
-          <div className="flex flex-wrap gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                categoryForm.reset(emptyCategory);
-                setCategoryEditorOpen(true);
-              }}
-            >
-              <Layers3 className="mr-2 h-4 w-4" />
-              New category
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                productForm.reset(emptyProduct);
-                setProductEditorOpen(true);
-              }}
-            >
-              <PackagePlus className="mr-2 h-4 w-4" />
-              New product
-            </Button>
+      <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Catalog control</div>
+            <h1 className="mt-3 font-display text-4xl text-[#241610]">Products and categories</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
+              Shape the menu your cashiers see, manage product visibility, and keep pricing polished for the front counter.
+            </p>
           </div>
-        ) : null}
+
+          {canEdit ? (
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  categoryForm.reset(emptyCategory);
+                  setCategoryEditorOpen(true);
+                }}
+              >
+                <Layers3 className="mr-2 h-4 w-4" />
+                New category
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  productForm.reset(emptyProduct);
+                  setProductEditorOpen(true);
+                }}
+              >
+                <PackagePlus className="mr-2 h-4 w-4" />
+                New product
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <Card className="p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Categories</div>
+        <Card className="border-[#eadbcb] bg-white p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Categories</div>
           <div className="mt-4 space-y-3">
-            {categoriesQuery.isLoading ? <div className="text-sm text-slate-500">Loading categories...</div> : null}
+            {categoriesQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading categories...</div> : null}
             {categoriesQuery.isError ? <div className="text-sm text-rose-500">{categoriesQuery.error.message}</div> : null}
+            {categories.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-5 text-sm text-[#7b685c]">
+                No categories yet. Add one to organize the live menu.
+              </div>
+            ) : null}
             {categories.map((category) => (
-              <div key={category.id} className="rounded-2xl border border-white/60 bg-slate-50 p-4">
+              <div key={category.id} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-slate-950">{category.name}</div>
-                    <div className="mt-1 text-sm text-slate-500">Sort order {category.sortOrder}</div>
+                    <div className="font-semibold text-[#241610]">{category.name}</div>
+                    <div className="mt-1 text-sm text-[#7b685c]">Sort order {category.sortOrder}</div>
                   </div>
                   <div
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      category.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                      category.isActive ? "bg-[#f3e7d8] text-[#7a4a2e]" : "bg-[#efe3d3] text-[#7b685c]"
                     }`}
                   >
-                    {category.isActive ? "Active" : "Hidden"}
+                    {category.isActive ? "Visible" : "Hidden"}
                   </div>
                 </div>
                 {canEdit ? (
                   <div className="mt-4 flex gap-2">
-                    <button
+                    <Button
                       type="button"
-                      className="rounded-full bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-panel"
+                      variant="ghost"
+                      className="flex-1 border border-[#eadbcb] bg-white"
                       onClick={() => {
                         categoryForm.reset({
                           id: category.id,
@@ -217,10 +227,11 @@ export function ProductsPage() {
                       }}
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="rounded-full bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-panel"
+                      variant="ghost"
+                      className="flex-1 border border-[#eadbcb] bg-white"
                       onClick={() => {
                         if (window.confirm(`Update visibility for ${category.name}?`)) {
                           toggleCategoryMutation.mutate({
@@ -231,7 +242,7 @@ export function ProductsPage() {
                       }}
                     >
                       {category.isActive ? "Hide" : "Restore"}
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
               </div>
@@ -240,42 +251,48 @@ export function ProductsPage() {
         </Card>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {productsQuery.isLoading ? <Card className="p-6 text-sm text-slate-500">Loading products...</Card> : null}
+          {productsQuery.isLoading ? <Card className="p-6 text-sm text-[#7b685c]">Loading products...</Card> : null}
           {productsQuery.isError ? <Card className="p-6 text-sm text-rose-500">{productsQuery.error.message}</Card> : null}
+          {products.length === 0 && !productsQuery.isLoading ? (
+            <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
+              No products yet. Add your first menu item to populate the POS screen.
+            </Card>
+          ) : null}
 
           {products.map((product) => (
-            <Card key={product.id} className="overflow-hidden">
+            <Card key={product.id} className="overflow-hidden border-[#eadbcb] bg-white">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="h-44 w-full object-cover" />
               ) : (
-                <div className="grid h-44 place-items-center bg-slate-100 text-sm text-slate-500">No product image</div>
+                <div className="grid h-44 place-items-center bg-[#f8f0e7] text-sm text-[#7b685c]">No product image</div>
               )}
               <div className="space-y-4 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{product.category}</div>
-                    <h2 className="mt-2 text-xl font-semibold text-slate-950">{product.name}</h2>
+                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">{product.category}</div>
+                    <h2 className="mt-2 text-xl font-semibold text-[#241610]">{product.name}</h2>
                   </div>
-                  <div className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800">
+                  <div className="rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
                     {formatMoney(product.price)}
                   </div>
                 </div>
 
-                <p className="text-sm text-slate-500">{product.description}</p>
+                <p className="text-sm leading-6 text-[#7b685c]">{product.description}</p>
 
                 <div className="flex items-center justify-between text-sm">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">SKU {product.sku}</span>
-                  <span className={product.stockQuantity <= 20 ? "font-semibold text-amber-700" : "text-slate-600"}>
+                  <span className="rounded-full border border-[#eadbcb] px-3 py-1 font-medium text-[#6c584b]">SKU {product.sku}</span>
+                  <span className={product.stockQuantity <= product.lowStockThreshold ? "font-semibold text-[#a36d40]" : "text-[#6c584b]"}>
                     Stock {product.stockQuantity}
                   </span>
                 </div>
+                <div className="text-sm text-[#7b685c]">Low-stock threshold: {product.lowStockThreshold}</div>
 
                 {canEdit ? (
                   <div className="flex gap-2">
                     <Button
                       type="button"
                       variant="ghost"
-                      className="flex-1"
+                      className="flex-1 border border-[#eadbcb] bg-white"
                       onClick={() => {
                         productForm.reset({
                           id: product.id,
@@ -285,6 +302,7 @@ export function ProductsPage() {
                           description: product.description,
                           price: product.price,
                           stockQuantity: product.stockQuantity,
+                          lowStockThreshold: product.lowStockThreshold,
                           imageUrl: product.imageUrl ?? "",
                           isActive: product.isActive
                         });
@@ -297,7 +315,7 @@ export function ProductsPage() {
                     <Button
                       type="button"
                       variant="ghost"
-                      className="flex-1"
+                      className="flex-1 border border-[#eadbcb] bg-white"
                       onClick={() => {
                         if (window.confirm(`Update visibility for ${product.name}?`)) {
                           toggleProductMutation.mutate({
@@ -318,36 +336,36 @@ export function ProductsPage() {
       </section>
 
       {productEditorOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <Card className="max-h-[90vh] w-full max-w-2xl overflow-auto p-6 md:p-8">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">
+          <Card className="max-h-[90vh] w-full max-w-2xl overflow-auto border-[#eadbcb] bg-white p-6 md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Catalog editor</div>
-                <h2 className="mt-2 text-3xl font-semibold text-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Catalog editor</div>
+                <h2 className="mt-2 text-3xl font-semibold text-[#241610]">
                   {productForm.getValues("id") ? "Update product" : "Create product"}
                 </h2>
               </div>
-              <button type="button" className="text-sm font-medium text-slate-500" onClick={() => setProductEditorOpen(false)}>
+              <button type="button" className="text-sm font-medium text-[#7b685c]" onClick={() => setProductEditorOpen(false)}>
                 Close
               </button>
             </div>
 
             <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={productForm.handleSubmit((values) => saveProductMutation.mutate(values))}>
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Product name</span>
-                <input {...productForm.register("name")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Product name</span>
+                <input {...productForm.register("name")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {productForm.formState.errors.name ? <p className="text-sm text-rose-500">{productForm.formState.errors.name.message}</p> : null}
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">SKU</span>
-                <input {...productForm.register("sku")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">SKU</span>
+                <input {...productForm.register("sku")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {productForm.formState.errors.sku ? <p className="text-sm text-rose-500">{productForm.formState.errors.sku.message}</p> : null}
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Category</span>
-                <select {...productForm.register("categoryId")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none">
+                <span className="text-sm font-medium text-[#5f4637]">Category</span>
+                <select {...productForm.register("categoryId")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4">
                   <option value="">Choose a category</option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
@@ -361,30 +379,38 @@ export function ProductsPage() {
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Image URL</span>
-                <input {...productForm.register("imageUrl")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Image URL</span>
+                <input {...productForm.register("imageUrl")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {productForm.formState.errors.imageUrl ? (
                   <p className="text-sm text-rose-500">{productForm.formState.errors.imageUrl.message}</p>
                 ) : null}
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Price</span>
-                <input type="number" step="0.01" {...productForm.register("price")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Price</span>
+                <input type="number" step="0.01" {...productForm.register("price")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {productForm.formState.errors.price ? <p className="text-sm text-rose-500">{productForm.formState.errors.price.message}</p> : null}
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Stock quantity</span>
-                <input type="number" {...productForm.register("stockQuantity")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Stock quantity</span>
+                <input type="number" {...productForm.register("stockQuantity")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {productForm.formState.errors.stockQuantity ? (
                   <p className="text-sm text-rose-500">{productForm.formState.errors.stockQuantity.message}</p>
                 ) : null}
               </label>
 
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#5f4637]">Low-stock threshold</span>
+                <input type="number" {...productForm.register("lowStockThreshold")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
+                {productForm.formState.errors.lowStockThreshold ? (
+                  <p className="text-sm text-rose-500">{productForm.formState.errors.lowStockThreshold.message}</p>
+                ) : null}
+              </label>
+
               <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Description</span>
-                <textarea {...productForm.register("description")} rows={4} className="w-full rounded-2xl border border-white/60 bg-slate-50 px-4 py-3 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Description</span>
+                <textarea {...productForm.register("description")} rows={4} className="w-full rounded-2xl bg-[#fffdf9] px-4 py-3" />
                 {productForm.formState.errors.description ? (
                   <p className="text-sm text-rose-500">{productForm.formState.errors.description.message}</p>
                 ) : null}
@@ -392,7 +418,7 @@ export function ProductsPage() {
 
               <label className="flex items-center gap-3 md:col-span-2">
                 <input type="checkbox" {...productForm.register("isActive")} className="h-4 w-4 rounded border-slate-300" />
-                <span className="text-sm text-slate-700">Show this product on the live POS screen</span>
+                <span className="text-sm text-[#5f4637]">Show this product on the live POS screen</span>
               </label>
 
               <div className="flex gap-3 md:col-span-2">
@@ -409,30 +435,30 @@ export function ProductsPage() {
       ) : null}
 
       {categoryEditorOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-          <Card className="w-full max-w-xl p-6 md:p-8">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">
+          <Card className="w-full max-w-xl border-[#eadbcb] bg-white p-6 md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Menu grouping</div>
-                <h2 className="mt-2 text-3xl font-semibold text-slate-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Menu grouping</div>
+                <h2 className="mt-2 text-3xl font-semibold text-[#241610]">
                   {categoryForm.getValues("id") ? "Update category" : "Create category"}
                 </h2>
               </div>
-              <button type="button" className="text-sm font-medium text-slate-500" onClick={() => setCategoryEditorOpen(false)}>
+              <button type="button" className="text-sm font-medium text-[#7b685c]" onClick={() => setCategoryEditorOpen(false)}>
                 Close
               </button>
             </div>
 
             <form className="mt-6 grid gap-4" onSubmit={categoryForm.handleSubmit((values) => saveCategoryMutation.mutate(values))}>
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Category name</span>
-                <input {...categoryForm.register("name")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Category name</span>
+                <input {...categoryForm.register("name")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {categoryForm.formState.errors.name ? <p className="text-sm text-rose-500">{categoryForm.formState.errors.name.message}</p> : null}
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Sort order</span>
-                <input type="number" {...categoryForm.register("sortOrder")} className="h-12 w-full rounded-2xl border border-white/60 bg-slate-50 px-4 outline-none" />
+                <span className="text-sm font-medium text-[#5f4637]">Sort order</span>
+                <input type="number" {...categoryForm.register("sortOrder")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
                 {categoryForm.formState.errors.sortOrder ? (
                   <p className="text-sm text-rose-500">{categoryForm.formState.errors.sortOrder.message}</p>
                 ) : null}
@@ -440,7 +466,7 @@ export function ProductsPage() {
 
               <label className="flex items-center gap-3">
                 <input type="checkbox" {...categoryForm.register("isActive")} className="h-4 w-4 rounded border-slate-300" />
-                <span className="text-sm text-slate-700">Show this category to cashiers</span>
+                <span className="text-sm text-[#5f4637]">Show this category to cashiers</span>
               </label>
 
               <div className="flex gap-3">

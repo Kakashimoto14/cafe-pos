@@ -3,29 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --background: 44 56% 96%;
-  --foreground: 220 30% 12%;
-  --border: 34 32% 87%;
-  --muted: 36 26% 90%;
-  --primary: 155 56% 28%;
-  --primary-foreground: 48 60% 97%;
-  --accent: 31 80% 71%;
-  --accent-foreground: 215 28% 15%;
-  --surface: 48 40% 98%;
+  --background: 34 53% 97%;
+  --foreground: 21 36% 10%;
+  --border: 31 42% 85%;
+  --muted: 32 38% 90%;
+  --primary: 24 46% 33%;
+  --primary-foreground: 36 70% 98%;
+  --accent: 29 45% 56%;
+  --accent-foreground: 21 36% 10%;
+  --surface: 34 52% 98%;
   --surface-elevated: 0 0% 100%;
 }
 
 .dark {
-  --background: 212 34% 10%;
-  --foreground: 46 46% 94%;
-  --border: 214 24% 20%;
-  --muted: 214 18% 18%;
-  --primary: 154 52% 49%;
-  --primary-foreground: 212 34% 10%;
-  --accent: 31 76% 58%;
-  --accent-foreground: 212 34% 10%;
-  --surface: 215 28% 14%;
-  --surface-elevated: 214 26% 18%;
+  --background: 24 29% 12%;
+  --foreground: 34 50% 95%;
+  --border: 24 21% 22%;
+  --muted: 24 20% 18%;
+  --primary: 29 47% 58%;
+  --primary-foreground: 24 29% 12%;
+  --accent: 30 38% 42%;
+  --accent-foreground: 34 50% 95%;
+  --surface: 24 26% 15%;
+  --surface-elevated: 24 24% 18%;
 }
 
 @layer base {
@@ -35,10 +35,33 @@
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(239, 227, 211, 0.85), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(192, 138, 90, 0.12), transparent 24%);
+    min-height: 100vh;
   }
 
   button,
-  input {
+  input,
+  select,
+  textarea {
     font: inherit;
+  }
+
+  input:not([type="checkbox"]),
+  select,
+  textarea {
+    @apply border border-border bg-white text-foreground transition outline-none;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  }
+
+  input:not([type="checkbox"]):focus,
+  select:focus,
+  textarea:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+
+  ::selection {
+    background: rgba(192, 138, 90, 0.22);
   }
 }

@@ -1,6 +1,6 @@
-# Cafe POS
+# Cozy Cafe POS
 
-Cafe POS is an enterprise-oriented cafe point-of-sale platform designed as a modular monolith with a premium React operations frontend and a Laravel API backend. This repository is not a tutorial-grade CRUD sample. It is the foundation of a commercial system intended to support fast cashier throughput, inventory integrity, shift accountability, payment extensibility, and maintainable long-term software delivery.
+Cozy Cafe POS is an enterprise-oriented cafe point-of-sale platform designed around a premium React operations frontend, Supabase-backed data workflows, and a modular monolith architecture direction for long-term growth. This repository is not a tutorial-grade CRUD sample. It is the foundation of a commercial system intended to support fast cashier throughput, inventory integrity, sales visibility, receipt handling, discount controls, payment extensibility, and maintainable long-term software delivery.
 
 ## Manuscript Purpose
 
@@ -86,39 +86,39 @@ The main engineering principles are:
 
 ### Data and Infrastructure
 
-- SQLite for zero-friction local execution
-- PostgreSQL as the intended operational database target
-- Redis-ready infrastructure layout
-- Docker Compose and Nginx scaffolding
+- Supabase Postgres for the live application database
+- Supabase Auth and Row Level Security for role-safe access
+- Vercel-ready frontend environment variables
+- Redis-ready and Docker/Nginx scaffolding still preserved for future backend services
 
 ## Current Repository State
 
-The repository is now runnable in local development.
+The repository is now runnable in local development against the live Supabase project.
 
 What is already working:
 
 - frontend dependencies installed
 - frontend production build verified
-- Laravel 12 backend bootstrapped
-- Sanctum installed
-- token-based login for terminal operators
+- Supabase client integration wired into the frontend
+- password login for terminal operators through Supabase Auth
+- Supabase RLS-backed products, categories, orders, discounts, and inventory adjustments
 - post-login React session loop fixed
 - route-level error boundary for cleaner runtime failures
-- seeded demo cashier and manager accounts
-- live product catalog API
-- POS frontend querying Laravel instead of local mock data
-- normalized order item persistence
-- SQLite local database initialized
-- migrations run successfully
-- Pest suite passing
-- portable PHP and Composer installed inside the repository
+- seeded demo admin, manager, and cashier accounts
+- real live product catalog
+- POS frontend querying Supabase instead of local mock data
+- normalized order item persistence with product name snapshots
+- discount-aware checkout
+- receipt view and browser print flow
+- inventory adjustments with movement history
+- sales reporting page and dashboard metrics
+- Supabase migrations applied successfully
+- portable PHP and Composer still preserved for the Laravel workspace, even though the active frontend flow no longer depends on it
 
 What remains intentionally incomplete:
 
-- full RBAC management flows
-- product CRUD screens connected to mutation forms
-- inventory deductions and recipe execution
-- payment gateway adapters beyond the abstraction layer
+- recipe-level ingredient deduction
+- payment gateway adapters beyond the mock/selectable payment layer
 - realtime kitchen board
 - offline sync queue
 - shift close and reconciliation workflows
@@ -182,13 +182,19 @@ The frontend is structured for a POS-first experience where rapid input handling
 The current UI includes:
 
 - operator login screen
-- premium dashboard shell
+- premium white-and-brown dashboard shell
+- Cozy Cafe POS branding and SVG logo assets
 - POS screen layout
 - animated live product grid
 - sticky cart panel
-- checkout submission into the Laravel order API
+- checkout submission into Supabase RPC order workflows
+- discount selection for senior, PWD, promo, and manager-only courtesy discounts
+- mock payment flows for cash, GCash, QR, InstaPay, Maya, card, and other/manual
+- post-checkout receipt flow with browser printing
+- inventory page with manual stock adjustments and history
+- sales page with totals, top items, and recent transactions
 - low-latency Zustand store
-- Vite dev proxy for `/api` and `/sanctum`
+- warm white, beige, caramel, and espresso design system
 
 ## Backend Architecture
 
@@ -361,13 +367,11 @@ These are architectural targets already reflected in the structure, even where i
 
 The security direction for the project includes:
 
-- Sanctum authentication
-- policy-based authorization
-- validated request objects
-- versioned API boundaries
+- Supabase Auth
+- Row Level Security on exposed application tables
+- role-safe discount, inventory, and order access
 - UUIDs for external identifiers
 - auditability as a first-class concern
-- strict file upload validation in future CRUD modules
 - secure secret handling through environment configuration
 
 ## Operational Flow
@@ -377,13 +381,12 @@ The intended service flow is:
 ```mermaid
 flowchart LR
     A["Cashier selects products"] --> B["Frontend POS store updates cart instantly"]
-    B --> C["Checkout action builds order payload"]
-    C --> D["Laravel API validates request"]
-    D --> E["OrderService orchestrates transaction"]
-    E --> F["Repository persists order"]
-    F --> G["Payment strategy captures payment"]
-    G --> H["OrderCreated event dispatches"]
-    H --> I["Kitchen / audit / notification listeners react"]
+    B --> C["Checkout action builds order payload with discount and payment details"]
+    C --> D["Supabase RPC validates stock, role access, and payment rules"]
+    D --> E["Order and order items persist"]
+    E --> F["Inventory movements are recorded"]
+    F --> G["Receipt view becomes printable"]
+    G --> H["Sales and dashboard queries refresh"]
 ```
 
 ## Local Runtime Commands
@@ -398,21 +401,15 @@ npm run dev
 
 This uses:
 
-- `npm run dev:backend` to serve Laravel on `http://127.0.0.1:9000`
 - `npm run dev:frontend` to serve Vite on `http://127.0.0.1:5173`
 
 ### Demo Credentials
 
-Use either of these local seeded accounts:
+Use any of these seeded Supabase accounts:
 
-- `cashier@aurora.test` / `password`
-- `manager@aurora.test` / `password`
-
-### Start Backend Only
-
-```powershell
-npm run dev:backend
-```
+- `admin@cafeposdemo.com` / `CafePos123!`
+- `manager@cafeposdemo.com` / `CafePos123!`
+- `cashier@cafeposdemo.com` / `CafePos123!`
 
 ### Start Frontend Only
 
@@ -420,10 +417,17 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
-### Run Backend Tests
+### Frontend Environment Variables
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+See `apps/frontend/.env.example`.
+
+### Seed Demo Users
 
 ```powershell
-npm run test:backend
+npm run seed:supabase-users
 ```
 
 ### Build Frontend
@@ -432,19 +436,23 @@ npm run test:backend
 npm run build:frontend
 ```
 
-### Run Backend Migrations
+### Run Frontend Tests
 
 ```powershell
-npm run migrate:backend
+npm run test:frontend
 ```
 
-### Switch To PostgreSQL Or MySQL
+### Supabase Migrations
 
-From `apps/backend`:
+- SQL migrations live in `supabase/migrations`
+- the latest feature phase adds discounts, inventory adjustments, receipt fields, and payment metadata
 
-- copy `.env.pgsql.example` to `.env` for PostgreSQL
-- copy `.env.mysql.example` to `.env` for MySQL
-- then run `npm run migrate:backend`
+### Vercel Frontend Variables
+
+Set these in Vercel before deploying:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ## Local Tooling Installed For This Repository
 
@@ -462,12 +470,9 @@ The following validations have already succeeded in this repository:
 
 - frontend `npm install`
 - frontend production build
-- Laravel dependency installation
-- Laravel migration run
-- Laravel database seeding
-- backend route registration
-- backend Pest test suite
-- frontend auth/session fix build verification
+- frontend Vitest run with `--passWithNoTests`
+- Supabase migrations for the operations phase
+- Supabase security cleanup migration
 
 ## Infrastructure Story
 
@@ -477,7 +482,7 @@ The repo includes Docker and Nginx scaffolding in:
 - `infrastructure/docker`
 - `infrastructure/nginx`
 
-The local execution path currently relies on the portable PHP runtime and SQLite because it is the fastest path to a working system on this machine. The Docker and PostgreSQL path remains the intended next operational hardening step.
+The local execution path currently relies on the Vite frontend pointed at the live Supabase project. The Docker, Nginx, and Laravel scaffolding remain in the repository for future service expansion, but the active product flow for products, sales, inventory, receipts, and accounts is now Supabase-backed.
 
 ## Implementation Highlights
 

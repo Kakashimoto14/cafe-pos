@@ -14,8 +14,8 @@ export function RequireRole({ allowedRoles, children }: RequireRoleProps) {
 
   if (!isInitialized) {
     return (
-      <Card className="p-6">
-        <div className="text-sm text-slate-500">Loading your access profile...</div>
+      <Card className="border-[#eadbcb] p-6">
+        <div className="text-sm text-[#7b685c]">Loading your access profile...</div>
       </Card>
     );
   }

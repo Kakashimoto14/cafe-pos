@@ -25,8 +25,24 @@ const OrdersPage = lazy(async () => ({
   default: (await import("@/pages/OrdersPage")).OrdersPage
 }));
 
+const InventoryPage = lazy(async () => ({
+  default: (await import("@/pages/InventoryPage")).InventoryPage
+}));
+
+const SalesPage = lazy(async () => ({
+  default: (await import("@/pages/SalesPage")).SalesPage
+}));
+
+const DiscountsPage = lazy(async () => ({
+  default: (await import("@/pages/DiscountsPage")).DiscountsPage
+}));
+
 const TeamPage = lazy(async () => ({
   default: (await import("@/pages/TeamPage")).TeamPage
+}));
+
+const ReceiptPage = lazy(async () => ({
+  default: (await import("@/pages/ReceiptPage")).ReceiptPage
 }));
 
 const PlaceholderPage = lazy(async () => ({
@@ -53,6 +69,30 @@ export const router = createBrowserRouter([
           { path: "products", element: <ProductsPage /> },
           { path: "orders", element: <OrdersPage /> },
           {
+            path: "inventory",
+            element: (
+              <RequireRole allowedRoles={["admin", "manager"]}>
+                <InventoryPage />
+              </RequireRole>
+            )
+          },
+          {
+            path: "sales",
+            element: (
+              <RequireRole allowedRoles={["admin", "manager"]}>
+                <SalesPage />
+              </RequireRole>
+            )
+          },
+          {
+            path: "discounts",
+            element: (
+              <RequireRole allowedRoles={["admin", "manager"]}>
+                <DiscountsPage />
+              </RequireRole>
+            )
+          },
+          {
             path: "team",
             element: (
               <RequireRole allowedRoles={["admin"]}>
@@ -62,6 +102,10 @@ export const router = createBrowserRouter([
           },
           { path: "settings", element: <PlaceholderPage title="Settings" /> }
         ]
+      },
+      {
+        path: "orders/:orderId/receipt",
+        element: <ReceiptPage />
       }
     ]
   }

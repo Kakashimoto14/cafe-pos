@@ -4,6 +4,18 @@ export function canManageCatalog(role?: AppRole | null) {
   return role === "admin" || role === "manager";
 }
 
+export function canManageInventory(role?: AppRole | null) {
+  return role === "admin" || role === "manager";
+}
+
+export function canViewSales(role?: AppRole | null) {
+  return role === "admin" || role === "manager";
+}
+
+export function canManageDiscounts(role?: AppRole | null) {
+  return role === "admin" || role === "manager";
+}
+
 export function canManageTeam(role?: AppRole | null) {
   return role === "admin";
 }
