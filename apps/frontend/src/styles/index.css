@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 44 56% 96%;
+  --foreground: 220 30% 12%;
+  --border: 34 32% 87%;
+  --muted: 36 26% 90%;
+  --primary: 155 56% 28%;
+  --primary-foreground: 48 60% 97%;
+  --accent: 31 80% 71%;
+  --accent-foreground: 215 28% 15%;
+  --surface: 48 40% 98%;
+  --surface-elevated: 0 0% 100%;
+}
+
+.dark {
+  --background: 212 34% 10%;
+  --foreground: 46 46% 94%;
+  --border: 214 24% 20%;
+  --muted: 214 18% 18%;
+  --primary: 154 52% 49%;
+  --primary-foreground: 212 34% 10%;
+  --accent: 31 76% 58%;
+  --accent-foreground: 212 34% 10%;
+  --surface: 215 28% 14%;
+  --surface-elevated: 214 26% 18%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+}

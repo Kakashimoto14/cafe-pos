@@ -1,0 +1,5 @@
+{
+    "config": {
+        "secure-http": true,
+        "disable-tls": false}
+}
