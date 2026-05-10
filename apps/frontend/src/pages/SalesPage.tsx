@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, ReceiptText, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, ReceiptText, Search, TrendingUp, Wallet, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
 
@@ -19,11 +19,36 @@ function todayDate() {
 export function SalesPage() {
   const [from, setFrom] = useState(todayDate());
   const [to, setTo] = useState(todayDate());
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
 
   const salesQuery = useQuery({
     queryKey: ["sales", from, to],
     queryFn: () => apiClient.salesSummary({ from, to: `${to}T23:59:59` })
   });
+
+  const filteredRecentOrders = useMemo(() => {
+    const recentOrders = salesQuery.data?.recentOrders ?? [];
+    const normalized = deferredQuery.trim().toLowerCase();
+
+    if (!normalized) {
+      return recentOrders;
+    }
+
+    return recentOrders.filter((order) =>
+      [
+        order.orderNumber,
+        order.cashierName,
+        order.paymentMethod,
+        order.paymentReference ?? "",
+        order.notes ?? "",
+        ...order.items.map((item) => item.productName)
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [deferredQuery, salesQuery.data?.recentOrders]);
 
   if (salesQuery.isLoading) {
     return <Card className="p-6 text-sm text-[#7b685c]">Loading sales summary...</Card>;
@@ -111,10 +136,28 @@ export function SalesPage() {
         </Card>
 
         <Card className="border-[#eadbcb] bg-white p-5">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Recent transactions</div>
-          <h2 className="mt-2 text-2xl font-semibold text-[#241610]">Latest completed tickets</h2>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Recent transactions</div>
+              <h2 className="mt-2 text-2xl font-semibold text-[#241610]">Latest completed tickets</h2>
+            </div>
+            <div className="flex items-center gap-3 rounded-[22px] border border-[#eadbcb] bg-white px-4 py-3 md:w-72">
+              <Search className="h-4 w-4 text-[#9a8170]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search tickets"
+                className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+              />
+              {query ? (
+                <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          </div>
           <div className="mt-5 space-y-3">
-            {summary.recentOrders.map((order) => (
+            {filteredRecentOrders.map((order) => (
               <div key={order.id} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -143,6 +186,11 @@ export function SalesPage() {
             {summary.recentOrders.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
                 Orders completed from the POS will appear here as sales activity.
+              </div>
+            ) : null}
+            {summary.recentOrders.length > 0 && filteredRecentOrders.length === 0 ? (
+              <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
+                No sales orders match that search.
               </div>
             ) : null}
           </div>

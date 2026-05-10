@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { Bell, LogOut, Search } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
@@ -48,13 +48,6 @@ export function Topbar() {
           <h2 className="font-display text-2xl text-[#241610]">{currentPage.title}</h2>
         </div>
         <div className="flex items-center gap-3 md:justify-end">
-          <div className="hidden items-center gap-2 rounded-2xl border border-[#eadbcb] bg-white px-4 py-3 shadow-[0_12px_28px_rgba(74,43,24,0.06)] md:flex">
-            <Search className="h-4 w-4 text-[#9a8170]" />
-            <input
-              className="w-56 bg-transparent text-sm text-[#5f4637] outline-none placeholder:text-[#a69080]"
-              placeholder="Search products, orders, or staff"
-            />
-          </div>
           <button className="rounded-2xl border border-[#eadbcb] bg-white p-3 shadow-[0_12px_28px_rgba(74,43,24,0.06)]" type="button">
             <Bell className="h-4 w-4 text-[#6c584b]" />
           </button>

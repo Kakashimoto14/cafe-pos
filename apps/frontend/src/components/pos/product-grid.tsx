@@ -1,6 +1,6 @@
 import { useDeferredValue, useState } from "react";
 import { motion } from "framer-motion";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { CategoryRecord, MenuProduct } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
@@ -18,21 +18,29 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
   const addItem = usePosStore((state) => state.addItem);
 
   const filtered = products.filter((product) => {
-    const matchesSearch = `${product.name} ${product.category}`.toLowerCase().includes(deferredQuery.toLowerCase());
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    const matchesSearch =
+      normalizedQuery.length === 0 ||
+      `${product.name} ${product.category} ${product.sku}`.toLowerCase().includes(normalizedQuery);
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center gap-3 rounded-[28px] border border-[#eadbcb] bg-white px-4 py-4 shadow-[0_16px_32px_rgba(74,43,24,0.07)]">
+      <div className="flex items-center gap-3 rounded-[24px] border border-[#eadbcb] bg-white px-4 py-3 shadow-[0_14px_28px_rgba(74,43,24,0.06)]">
         <Search className="h-5 w-5 text-[#9a8170]" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="w-full bg-transparent text-base outline-none placeholder:text-[#a69080]"
-          placeholder="Search coffee, pastries, or scan barcode"
+          placeholder="Search by product, category, SKU, or barcode"
         />
+        {query ? (
+          <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
       <div className="flex gap-2 overflow-auto pb-1">
         <button
@@ -64,7 +72,7 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {filtered.length === 0 ? (
           <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
-            No products match this search or category filter.
+            No products found. Try another name, category, SKU, or barcode.
           </Card>
         ) : null}
         {filtered.map((product, index) => (
@@ -84,27 +92,25 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
             className="text-left"
             disabled={product.stockQuantity <= 0}
           >
-            <Card className="overflow-hidden border-[#eadbcb] bg-white transition-shadow hover:shadow-[0_24px_48px_rgba(74,43,24,0.12)] disabled:cursor-not-allowed">
+            <Card className="overflow-hidden border-[#eadbcb] bg-white transition-shadow hover:shadow-[0_20px_38px_rgba(74,43,24,0.11)] disabled:cursor-not-allowed">
               {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" />
+                <img src={product.imageUrl} alt={product.name} className="h-32 w-full object-cover md:h-36" />
               ) : (
-                <div className="grid h-40 place-items-center bg-[#f8f0e7] text-sm text-[#7b685c]">No image</div>
+                <div className="grid h-32 place-items-center bg-[#f8f0e7] text-sm text-[#7b685c] md:h-36">No image</div>
               )}
-              <div className="space-y-3 p-4">
+              <div className="space-y-2.5 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">{product.category}</div>
-                    <h3 className="mt-1 text-lg font-semibold text-[#241610]">{product.name}</h3>
+                    <h3 className="mt-1 text-base font-semibold text-[#241610]">{product.name}</h3>
                   </div>
-                  <div className="rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
+                  <div className="shrink-0 rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
                     PHP {product.price.toFixed(2)}
                   </div>
                 </div>
-                <p className="text-sm leading-6 text-[#7b685c]">{product.description}</p>
+                <p className="line-clamp-2 text-sm leading-5 text-[#7b685c]">{product.description}</p>
                 <div className="flex items-center justify-between">
-                  <div className="text-xs font-medium uppercase tracking-[0.2em] text-[#a69080]">
-                    {product.stockQuantity <= 0 ? "Sold out" : "Tap to add"}
-                  </div>
+                  <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a69080]">{product.sku}</div>
                   <div
                     className={`rounded-full border px-3 py-1 text-xs font-semibold ${
                       product.stockQuantity <= product.lowStockThreshold

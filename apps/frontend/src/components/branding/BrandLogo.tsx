@@ -1,5 +1,4 @@
-import cozyCafeLogo from "@/assets/brand/cozy-cafe-logo.svg";
-import cozyCafeMark from "@/assets/brand/cozy-cafe-mark.svg";
+import cozyCafeLogo from "@/assets/brand/cozy-cafe-pos-logo.png";
 import { cn } from "@/utils/cn";
 
 type BrandLogoProps = {
@@ -10,8 +9,8 @@ type BrandLogoProps = {
 
 export function BrandLogo({ className, markClassName, variant = "full" }: BrandLogoProps) {
   if (variant === "mark") {
-    return <img src={cozyCafeMark} alt="Cozy Cafe POS" className={cn("h-12 w-12", markClassName)} />;
+    return <img src={cozyCafeLogo} alt="Cozy Cafe POS" className={cn("h-12 w-12 rounded-2xl object-contain", markClassName)} />;
   }
 
-  return <img src={cozyCafeLogo} alt="Cozy Cafe POS" className={cn("h-12 w-auto", className)} />;
+  return <img src={cozyCafeLogo} alt="Cozy Cafe POS" className={cn("h-14 w-auto object-contain", className)} />;
 }

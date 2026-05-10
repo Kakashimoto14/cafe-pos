@@ -30,7 +30,7 @@ export function Sidebar() {
       <aside className="hidden border-r border-[#eadbcb] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,245,238,0.94))] p-6 backdrop-blur-xl lg:flex lg:flex-col">
         <div className="mb-8">
           <div className="rounded-[28px] border border-[#eadbcb] bg-white/95 p-4 shadow-[0_20px_40px_rgba(74,43,24,0.07)]">
-            <BrandLogo className="h-11" />
+            <BrandLogo className="h-24 rounded-3xl bg-white object-contain" />
             <div className="mt-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#8f7767]">Cozy Cafe POS</div>
             <h1 className="mt-2 font-display text-2xl text-[#241610]">Cafe operations hub</h1>
             <p className="mt-3 text-sm leading-6 text-[#7b685c]">

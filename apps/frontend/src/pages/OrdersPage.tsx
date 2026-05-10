@@ -1,5 +1,6 @@
+import { useDeferredValue, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ReceiptText } from "lucide-react";
+import { ReceiptText, Search, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
 
@@ -12,6 +13,9 @@ function formatMoney(value: number) {
 }
 
 export function OrdersPage() {
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+
   const ordersQuery = useQuery({
     queryKey: ["orders"],
     queryFn: () => apiClient.listOrders()
@@ -26,6 +30,28 @@ export function OrdersPage() {
   }
 
   const orders = ordersQuery.data ?? [];
+  const filteredOrders = useMemo(() => {
+    const normalized = deferredQuery.trim().toLowerCase();
+
+    if (!normalized) {
+      return orders;
+    }
+
+    return orders.filter((order) =>
+      [
+        order.orderNumber,
+        order.orderType.replace("_", " "),
+        order.paymentMethod,
+        order.cashierName,
+        order.paymentReference ?? "",
+        order.notes ?? "",
+        ...order.items.map((item) => item.productName)
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    );
+  }, [deferredQuery, orders]);
 
   return (
     <div className="space-y-6">
@@ -37,6 +63,20 @@ export function OrdersPage() {
             Cashiers see their own tickets. Managers and admins can review the whole floor.
           </p>
         </div>
+        <div className="flex w-full items-center gap-3 rounded-[24px] border border-[#eadbcb] bg-white px-4 py-3 shadow-[0_14px_28px_rgba(74,43,24,0.06)] md:max-w-md">
+          <Search className="h-5 w-5 text-[#9a8170]" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search order, payment, cashier, or item"
+            className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </section>
 
       {orders.length === 0 ? (
@@ -47,9 +87,17 @@ export function OrdersPage() {
             <p className="mt-2 text-sm text-[#7b685c]">Orders created from the POS screen will appear here immediately.</p>
           </div>
         </Card>
+      ) : filteredOrders.length === 0 ? (
+        <Card className="grid min-h-72 place-items-center p-6 text-center">
+          <div>
+            <ReceiptText className="mx-auto h-8 w-8 text-[#b38d72]" />
+            <h2 className="mt-4 text-xl font-semibold text-[#241610]">No orders found</h2>
+            <p className="mt-2 text-sm text-[#7b685c]">Try another order number, cashier, payment method, or item name.</p>
+          </div>
+        </Card>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
-          {orders.map((order) => (
+          {filteredOrders.map((order) => (
             <Card key={order.id} className="border-[#eadbcb] bg-white p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>

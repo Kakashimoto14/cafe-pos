@@ -46,7 +46,7 @@ export function LoginPage() {
       <div className="relative mx-auto grid min-h-screen w-full max-w-[1600px] items-center gap-8 px-4 py-6 md:px-6 lg:grid-cols-[1.12fr_520px] lg:px-8 lg:py-8">
         <section className="order-2 space-y-6 lg:order-1 lg:pr-8">
           <div className="inline-flex items-center gap-4 rounded-[24px] border border-[#eadbcb] bg-white/92 px-4 py-3 text-sm font-medium text-[#7a4a2e] shadow-[0_12px_24px_rgba(74,43,24,0.06)]">
-            <BrandLogo variant="mark" markClassName="h-10 w-10" />
+            <BrandLogo className="h-16" />
             Cozy Cafe POS
           </div>
 
@@ -101,7 +101,7 @@ export function LoginPage() {
       <section className="order-1 flex items-center justify-center lg:order-2">
           <Card className="w-full max-w-md border-[#eadbcb] bg-white/96 p-6 md:p-8">
             <div className="flex items-center gap-3">
-              <BrandLogo variant="mark" markClassName="h-12 w-12" />
+              <BrandLogo className="h-20" />
               <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Cozy Cafe POS</div>
             </div>
             <h2 className="mt-3 font-display text-4xl text-[#241610]">Welcome back</h2>

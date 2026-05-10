@@ -32,6 +32,32 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+function getCheckoutErrorMessage(error: Error) {
+  const message = error.message || "Something went wrong while completing the order.";
+
+  if (/insufficient stock/i.test(message)) {
+    return message;
+  }
+
+  if (/payment reference/i.test(message)) {
+    return "Enter the wallet or bank reference number before completing this order.";
+  }
+
+  if (/cash tendered/i.test(message)) {
+    return "Enter a cash amount that covers the full order total.";
+  }
+
+  if (/discount/i.test(message)) {
+    return message;
+  }
+
+  if (/ambiguous|column reference/i.test(message)) {
+    return "Checkout hit a database configuration issue. Please refresh and try again.";
+  }
+
+  return message;
+}
+
 export function CartPanel() {
   const queryClient = useQueryClient();
   const [isPaymentOpen, setPaymentOpen] = useState(false);
@@ -117,7 +143,10 @@ export function CartPanel() {
       void queryClient.invalidateQueries({ queryKey: ["sales"] });
     },
     onError: (error) => {
-      toast.error(error.message);
+      console.error("Unable to complete POS order", error);
+      toast.error("Order could not be completed", {
+        description: getCheckoutErrorMessage(error)
+      });
     }
   });
 
@@ -134,13 +163,13 @@ export function CartPanel() {
 
   return (
     <>
-      <Card className="sticky top-28 flex h-fit flex-col gap-5 border-[#eadbcb] bg-white p-5">
-        <div>
+      <Card className="flex min-h-[620px] flex-col gap-4 border-[#eadbcb] bg-white p-5 xl:sticky xl:top-24 xl:h-[calc(100vh-7rem)] xl:min-h-0">
+        <div className="shrink-0">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Current order</div>
           <h3 className="mt-2 text-2xl font-semibold text-[#241610]">Cart summary</h3>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[#f7efe5] p-1">
+        <div className="grid shrink-0 grid-cols-3 gap-2 rounded-2xl bg-[#f7efe5] p-1">
           {channels.map((item) => (
             <button
               key={item.value}
@@ -155,7 +184,7 @@ export function CartPanel() {
           ))}
         </div>
 
-        <div className="max-h-[360px] space-y-3 overflow-auto pr-1">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {cart.length === 0 ? (
             <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-center text-sm text-[#7b685c]">
               <ShoppingBag className="mx-auto mb-3 h-6 w-6 text-[#b38d72]" />
@@ -198,7 +227,7 @@ export function CartPanel() {
           )}
         </div>
 
-        <div className="space-y-2 rounded-[24px] border border-[#eadbcb] bg-[linear-gradient(180deg,#fff8ef,#f4e8da)] p-4 text-[#241610]">
+        <div className="shrink-0 space-y-2 rounded-[24px] border border-[#eadbcb] bg-[linear-gradient(180deg,#fff8ef,#f4e8da)] p-4 text-[#241610]">
           <div className="flex items-center justify-between text-sm text-[#7b685c]">
             <span>Subtotal</span>
             <span>{formatMoney(paymentSummary.subtotal)}</span>
@@ -223,7 +252,7 @@ export function CartPanel() {
           </div>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid shrink-0 gap-3">
           <Button size="lg" onClick={openPayment} disabled={cart.length === 0}>
             <Wallet className="mr-2 h-4 w-4" />
             Charge customer
@@ -234,12 +263,26 @@ export function CartPanel() {
         </div>
       </Card>
 
+      {cart.length > 0 ? (
+        <div className="fixed inset-x-4 bottom-24 z-30 rounded-[24px] border border-[#d9c2ac] bg-white/95 p-3 shadow-[0_20px_45px_rgba(74,43,24,0.2)] backdrop-blur-xl lg:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">{cart.length} item ticket</div>
+              <div className="mt-1 text-lg font-semibold text-[#241610]">{formatMoney(paymentSummary.grandTotal)}</div>
+            </div>
+            <Button size="lg" onClick={openPayment}>
+              Checkout
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {isPaymentOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-5xl rounded-[32px] border border-[#eadbcb] bg-white p-6 shadow-[0_30px_70px_rgba(74,43,24,0.18)]"
+            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-[#eadbcb] bg-white p-6 shadow-[0_30px_70px_rgba(74,43,24,0.18)]"
           >
             <div className="mb-6 flex items-center justify-between">
               <div>

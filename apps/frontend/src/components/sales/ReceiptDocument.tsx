@@ -17,7 +17,7 @@ export function ReceiptDocument({ order }: ReceiptDocumentProps) {
   return (
     <article className="mx-auto w-full max-w-[360px] rounded-[28px] border border-[#eadbcb] bg-white p-6 text-[#241610] shadow-[0_24px_60px_rgba(74,43,24,0.08)] print:max-w-[300px] print:rounded-none print:border-none print:p-0 print:shadow-none">
       <div className="flex justify-center">
-        <BrandLogo className="h-10" />
+        <BrandLogo className="h-16" />
       </div>
 
       <div className="mt-5 border-y border-dashed border-[#d9c2ac] py-4 text-center">

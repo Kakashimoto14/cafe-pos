@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, Boxes, History, PackagePlus } from "lucide-react";
+import { AlertTriangle, History, PackagePlus, Search, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -179,12 +179,20 @@ export function InventoryPage() {
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Stock list</div>
                 <h2 className="mt-1 text-2xl font-semibold text-[#241610]">Current product counts</h2>
               </div>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search product, SKU, or category"
-                className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4 md:max-w-sm"
-              />
+              <div className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#eadbcb] bg-[#fffdf9] px-4 md:max-w-sm">
+                <Search className="h-4 w-4 text-[#9a8170]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search product, SKU, or category"
+                  className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+                />
+                {query ? (
+                  <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-5 grid gap-3">

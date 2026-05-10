@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Layers3, PackagePlus, PencilLine } from "lucide-react";
+import { Layers3, PackagePlus, PencilLine, Search, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { CategoryFormValues, ProductFormValues } from "@cafe/shared-types";
@@ -63,6 +63,8 @@ export function ProductsPage() {
   const user = useAuthStore((state) => state.user);
   const [productEditorOpen, setProductEditorOpen] = useState(false);
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
 
   const categoriesQuery = useQuery({
     queryKey: ["categories", "all"],
@@ -143,6 +145,17 @@ export function ProductsPage() {
 
   const categories = categoriesQuery.data ?? [];
   const products = productsQuery.data ?? [];
+  const filteredProducts = useMemo(() => {
+    const normalized = deferredQuery.trim().toLowerCase();
+
+    if (!normalized) {
+      return products;
+    }
+
+    return products.filter((product) =>
+      `${product.name} ${product.sku} ${product.category} ${product.description}`.toLowerCase().includes(normalized)
+    );
+  }, [deferredQuery, products]);
 
   return (
     <div className="space-y-6">
@@ -250,7 +263,23 @@ export function ProductsPage() {
           </div>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-4">
+          <Card className="flex items-center gap-3 border-[#eadbcb] bg-white px-4 py-3">
+            <Search className="h-5 w-5 text-[#9a8170]" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search product name, SKU, category, or description"
+              className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+            />
+            {query ? (
+              <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {productsQuery.isLoading ? <Card className="p-6 text-sm text-[#7b685c]">Loading products...</Card> : null}
           {productsQuery.isError ? <Card className="p-6 text-sm text-rose-500">{productsQuery.error.message}</Card> : null}
           {products.length === 0 && !productsQuery.isLoading ? (
@@ -258,8 +287,13 @@ export function ProductsPage() {
               No products yet. Add your first menu item to populate the POS screen.
             </Card>
           ) : null}
+          {products.length > 0 && filteredProducts.length === 0 && !productsQuery.isLoading ? (
+            <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
+              No products found. Try another product name, SKU, or category.
+            </Card>
+          ) : null}
 
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <Card key={product.id} className="overflow-hidden border-[#eadbcb] bg-white">
               {product.imageUrl ? (
                 <img src={product.imageUrl} alt={product.name} className="h-44 w-full object-cover" />
@@ -332,6 +366,7 @@ export function ProductsPage() {
               </div>
             </Card>
           ))}
+          </div>
         </div>
       </section>
 
