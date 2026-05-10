@@ -8,9 +8,11 @@
     "packages/ui-kit"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,frontend \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "npm run dev:frontend",
+    "dev:legacy": "concurrently -n backend,frontend \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd apps\\backend && ..\\..\\tools\\php\\php.exe -S 127.0.0.1:8000 -t public",
     "dev:frontend": "npm run dev --workspace @cafe/frontend",
+    "seed:supabase-users": "node scripts/seed-supabase-demo-users.mjs",
     "migrate:backend": "cd apps\\backend && ..\\..\\tools\\php\\php.exe artisan migrate --force",
     "build:frontend": "npm run build --workspace @cafe/frontend",
     "test:frontend": "npm run test --workspace @cafe/frontend",

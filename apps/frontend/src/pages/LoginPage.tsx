@@ -26,19 +26,15 @@ export function LoginPage() {
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "cashier@aurora.test",
-      password: "password"
+      email: "cashier@cafeposdemo.com",
+      password: "CafePos123!"
     }
   });
 
   const loginMutation = useMutation({
-    mutationFn: (values: LoginValues) =>
-      apiClient.login({
-        ...values,
-        device_name: "Aurora POS Terminal"
-      }),
+    mutationFn: (values: LoginValues) => apiClient.login(values),
     onSuccess: (result) => {
-      setSession(result.token, result.user);
+      setSession(result.session, result.user);
       startTransition(() => navigate(from, { replace: true }));
     }
   });
@@ -54,14 +50,14 @@ export function LoginPage() {
               Enterprise service flow for modern cafes.
             </h1>
             <p className="mt-5 max-w-xl text-base text-slate-600">
-              Phase 2 brings the POS online with token auth, live product sync, and real order persistence.
+              Supabase now powers authentication, catalog data, and real-time safe Postgres-backed POS transactions.
             </p>
           </div>
           <div className="grid gap-4">
             {[
-              { icon: ShieldCheck, title: "Token auth", body: "Sanctum-backed device sessions for each terminal." },
-              { icon: Coffee, title: "Live catalog", body: "Products are now served from Laravel, not local mock data." },
-              { icon: LockKeyhole, title: "Operator roles", body: "Cashiers, managers, and admins are modeled for policy control." }
+              { icon: ShieldCheck, title: "Secure auth", body: "Supabase Auth sessions keep every terminal signed in safely." },
+              { icon: Coffee, title: "Live catalog", body: "Products and categories now come from the production Postgres dataset." },
+              { icon: LockKeyhole, title: "Operator roles", body: "RLS-backed roles protect products, orders, and team access." }
             ].map((item) => (
               <Card key={item.title} className="flex items-start gap-4 p-5">
                 <div className="rounded-2xl bg-slate-950 p-3 text-white">
@@ -81,7 +77,7 @@ export function LoginPage() {
             <div className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Terminal access</div>
             <h2 className="mt-3 font-display text-4xl text-slate-950">Sign in to Aurora POS</h2>
             <p className="mt-3 text-sm text-slate-500">
-              Demo login is prefilled. Use `cashier@aurora.test` and `password`.
+              Demo login is prefilled. Use `cashier@cafeposdemo.com` and `CafePos123!` after seeding the Supabase demo accounts.
             </p>
 
             <form className="mt-8 space-y-4" onSubmit={form.handleSubmit((values) => loginMutation.mutate(values))}>

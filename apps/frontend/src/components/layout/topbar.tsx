@@ -6,18 +6,11 @@ import { useAuthStore } from "@/stores/auth-store";
 
 export function Topbar() {
   const navigate = useNavigate();
-  const { token, user, clearSession } = useAuthStore((state) => ({
-    token: state.token,
-    user: state.user,
-    clearSession: state.clearSession
-  }));
+  const user = useAuthStore((state) => state.user);
+  const clearSession = useAuthStore((state) => state.clearSession);
 
   const logoutMutation = useMutation({
-    mutationFn: async () => {
-      if (token) {
-        await apiClient.logout(token);
-      }
-    },
+    mutationFn: () => apiClient.logout(),
     onSettled: () => {
       clearSession();
       navigate("/login", { replace: true });
@@ -28,7 +21,7 @@ export function Topbar() {
     <header className="sticky top-0 z-10 border-b border-white/50 bg-background/80 px-4 py-4 backdrop-blur-xl md:px-6 xl:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">Morning shift</p>
+          <p className="text-sm font-medium text-slate-500">Live terminal</p>
           <h2 className="font-display text-2xl text-slate-950">Service command center</h2>
         </div>
         <div className="flex items-center gap-3">

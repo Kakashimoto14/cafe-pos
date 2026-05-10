@@ -102,6 +102,8 @@ What is already working:
 - Laravel 12 backend bootstrapped
 - Sanctum installed
 - token-based login for terminal operators
+- post-login React session loop fixed
+- route-level error boundary for cleaner runtime failures
 - seeded demo cashier and manager accounts
 - live product catalog API
 - POS frontend querying Laravel instead of local mock data
@@ -173,6 +175,7 @@ The frontend is structured for a POS-first experience where rapid input handling
 - future API integration through `/api` proxying in Vite
 - a reusable design system layer
 - responsive cashier-friendly layouts
+- predictable Zustand subscription behavior without hydration loops
 
 ### Current Frontend Experience
 
@@ -308,6 +311,11 @@ The products and order routes sit behind Sanctum auth. A generic authenticated `
 
 Local development uses SQLite so the app can run immediately on machines without PostgreSQL.
 
+If you want a less temporary setup, the repository now includes:
+
+- `apps/backend/.env.pgsql.example`
+- `apps/backend/.env.mysql.example`
+
 ### Target Operational Database
 
 PostgreSQL remains the intended operational database because it provides:
@@ -430,6 +438,14 @@ npm run build:frontend
 npm run migrate:backend
 ```
 
+### Switch To PostgreSQL Or MySQL
+
+From `apps/backend`:
+
+- copy `.env.pgsql.example` to `.env` for PostgreSQL
+- copy `.env.mysql.example` to `.env` for MySQL
+- then run `npm run migrate:backend`
+
 ## Local Tooling Installed For This Repository
 
 To make this machine runnable without a pre-existing PHP environment, the following were installed locally inside the repository:
@@ -451,6 +467,7 @@ The following validations have already succeeded in this repository:
 - Laravel database seeding
 - backend route registration
 - backend Pest test suite
+- frontend auth/session fix build verification
 
 ## Infrastructure Story
 

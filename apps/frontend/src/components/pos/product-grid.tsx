@@ -1,22 +1,26 @@
 import { useDeferredValue, useState } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
-import type { MenuProduct } from "@cafe/shared-types";
+import type { CategoryRecord, MenuProduct } from "@cafe/shared-types";
 import { Card } from "@/components/ui/card";
 import { usePosStore } from "@/stores/pos-store";
 
 type ProductGridProps = {
   products: MenuProduct[];
+  categories: CategoryRecord[];
 };
 
-export function ProductGrid({ products }: ProductGridProps) {
+export function ProductGrid({ products, categories }: ProductGridProps) {
   const [query, setQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const deferredQuery = useDeferredValue(query);
   const addItem = usePosStore((state) => state.addItem);
 
-  const filtered = products.filter((product) =>
-    `${product.name} ${product.category}`.toLowerCase().includes(deferredQuery.toLowerCase())
-  );
+  const filtered = products.filter((product) => {
+    const matchesSearch = `${product.name} ${product.category}`.toLowerCase().includes(deferredQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <section className="space-y-4">
@@ -29,7 +33,35 @@ export function ProductGrid({ products }: ProductGridProps) {
           placeholder="Search menu or scan barcode"
         />
       </div>
+      <div className="flex gap-2 overflow-auto pb-1">
+        <button
+          type="button"
+          onClick={() => setSelectedCategory("all")}
+          className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+            selectedCategory === "all" ? "bg-slate-950 text-white" : "bg-white/80 text-slate-600"
+          }`}
+        >
+          All items
+        </button>
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => setSelectedCategory(category.id)}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              selectedCategory === category.id ? "bg-slate-950 text-white" : "bg-white/80 text-slate-600"
+            }`}
+          >
+            {category.name}
+          </button>
+        ))}
+      </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {filtered.length === 0 ? (
+          <Card className="col-span-full p-6 text-sm text-slate-500">
+            No products match this search or category filter.
+          </Card>
+        ) : null}
         {filtered.map((product, index) => (
           <motion.button
             key={product.id}
@@ -40,7 +72,11 @@ export function ProductGrid({ products }: ProductGridProps) {
             className="text-left"
           >
             <Card className="overflow-hidden">
-              <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" />
+              {product.imageUrl ? (
+                <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" />
+              ) : (
+                <div className="grid h-40 place-items-center bg-slate-100 text-sm text-slate-500">No image</div>
+              )}
               <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -54,6 +90,9 @@ export function ProductGrid({ products }: ProductGridProps) {
                   </div>
                 </div>
                 <p className="text-sm text-slate-500">{product.description}</p>
+                <div className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                  Stock {product.stockQuantity}
+                </div>
               </div>
             </Card>
           </motion.button>

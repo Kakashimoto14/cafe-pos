@@ -1,12 +1,11 @@
 import { useEffect, useEffectEvent, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
-import { useAuthStore } from "@/stores/auth-store";
 import { usePosStore } from "@/stores/pos-store";
 
 const channels = [
@@ -16,9 +15,14 @@ const channels = [
 ] as const;
 
 export function CartPanel() {
+  const queryClient = useQueryClient();
   const [isPaymentOpen, setPaymentOpen] = useState(false);
-  const { cart, channel, paymentSummary, removeItem, clearCart, setChannel } = usePosStore();
-  const token = useAuthStore((state) => state.token);
+  const cart = usePosStore((state) => state.cart);
+  const channel = usePosStore((state) => state.channel);
+  const paymentSummary = usePosStore((state) => state.paymentSummary);
+  const removeItem = usePosStore((state) => state.removeItem);
+  const clearCart = usePosStore((state) => state.clearCart);
+  const setChannel = usePosStore((state) => state.setChannel);
 
   const openPayment = useEffectEvent(() => {
     if (cart.length > 0) {
@@ -27,21 +31,15 @@ export function CartPanel() {
   });
 
   const orderMutation = useMutation({
-    mutationFn: async () => {
-      if (!token) {
-        throw new Error("Terminal session expired.");
-      }
-
-      return apiClient.createOrder(
-        {
-          order_type: channel,
-          items: cart.map((item) => ({
-            product_id: item.product.id,
-            quantity: item.quantity
-          }))
-        },
-        token
-      );
+    mutationFn: async (paymentMethod: "cash" | "card" | "gcash" | "maya" | "qr") => {
+      return apiClient.createOrder({
+        order_type: channel,
+        payment_method: paymentMethod,
+        items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity
+        }))
+      });
     },
     onSuccess: (result) => {
       toast.success(`Order ${result.order_number} opened`, {
@@ -49,6 +47,9 @@ export function CartPanel() {
       });
       clearCart();
       setPaymentOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error) => {
       toast.error(error.message);
@@ -153,14 +154,20 @@ export function CartPanel() {
               </button>
             </div>
             <div className="space-y-3">
-              {["Cash", "Card", "GCash", "Maya", "Split payment"].map((method) => (
+              {[
+                { label: "Cash", value: "cash" as const },
+                { label: "Card", value: "card" as const },
+                { label: "GCash", value: "gcash" as const },
+                { label: "Maya", value: "maya" as const },
+                { label: "QR Payment", value: "qr" as const }
+              ].map((method) => (
                 <button
-                  key={method}
+                  key={method.value}
                   disabled={orderMutation.isPending}
-                  onClick={() => orderMutation.mutate()}
+                  onClick={() => orderMutation.mutate(method.value)}
                   className="flex w-full items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 text-left transition hover:border-slate-950"
                 >
-                  <span className="font-medium text-slate-900">{method}</span>
+                  <span className="font-medium text-slate-900">{method.label}</span>
                   <span className="text-sm text-slate-500">
                     {orderMutation.isPending ? "Submitting..." : "Ready"}
                   </span>

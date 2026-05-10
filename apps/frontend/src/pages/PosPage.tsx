@@ -4,14 +4,16 @@ import { ProductGrid } from "@/components/pos/product-grid";
 import { CartPanel } from "@/components/pos/cart-panel";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
-import { useAuthStore } from "@/stores/auth-store";
 
 export function PosPage() {
-  const token = useAuthStore((state) => state.token);
   const productsQuery = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => apiClient.products(token ?? ""),
-    enabled: Boolean(token)
+    queryKey: ["products", "active"],
+    queryFn: async () => apiClient.products({ activeOnly: true })
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: ["categories", "active"],
+    queryFn: () => apiClient.categories({ activeOnly: true })
   });
 
   return (
@@ -46,23 +48,25 @@ export function PosPage() {
           <div className="mt-6 grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/60 bg-slate-50 p-4 text-sm text-slate-600">
               <ScanLine className="mb-3 h-5 w-5 text-slate-900" />
-              Barcode pipeline reserved for USB and camera scanner adapters.
+              POS is reading from the live Supabase catalog, ready for scanner adapters next.
             </div>
             <div className="rounded-2xl border border-white/60 bg-slate-50 p-4 text-sm text-slate-600">
               <Keyboard className="mb-3 h-5 w-5 text-slate-900" />
               `Ctrl/Cmd + Enter` opens checkout for keyboard-first cashiers.
             </div>
             <div className="rounded-2xl border border-white/60 bg-slate-50 p-4 text-sm text-slate-600">
-              Sticky cart keeps totals visible during peak-hour service.
+              Sticky cart stays synced while stock is deducted on every completed order.
             </div>
           </div>
         </Card>
-        {productsQuery.isLoading ? (
+        {productsQuery.isLoading || categoriesQuery.isLoading ? (
           <Card className="p-6 text-sm text-slate-500">Loading live catalog...</Card>
         ) : productsQuery.isError ? (
           <Card className="p-6 text-sm text-rose-500">{productsQuery.error.message}</Card>
+        ) : categoriesQuery.isError ? (
+          <Card className="p-6 text-sm text-rose-500">{categoriesQuery.error.message}</Card>
         ) : (
-          <ProductGrid products={productsQuery.data ?? []} />
+          <ProductGrid products={productsQuery.data ?? []} categories={categoriesQuery.data ?? []} />
         )}
       </div>
       <CartPanel />

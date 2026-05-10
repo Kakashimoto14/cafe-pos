@@ -1,17 +1,21 @@
 import { BarChart3, Coffee, Package2, ReceiptText, Settings2, Users2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAuthStore } from "@/stores/auth-store";
+import { canManageTeam, canViewSettings } from "@/utils/roles";
 import { cn } from "@/utils/cn";
 
-const items = [
-  { to: "/", label: "Overview", icon: BarChart3 },
-  { to: "/pos", label: "POS", icon: Coffee },
-  { to: "/products", label: "Products", icon: Package2 },
-  { to: "/orders", label: "Orders", icon: ReceiptText },
-  { to: "/customers", label: "Customers", icon: Users2 },
-  { to: "/settings", label: "Settings", icon: Settings2 }
-];
-
 export function Sidebar() {
+  const role = useAuthStore((state) => state.user?.role);
+
+  const items = [
+    { to: "/", label: "Overview", icon: BarChart3, visible: true },
+    { to: "/pos", label: "POS", icon: Coffee, visible: true },
+    { to: "/products", label: "Products", icon: Package2, visible: true },
+    { to: "/orders", label: "Orders", icon: ReceiptText, visible: true },
+    { to: "/team", label: "Team", icon: Users2, visible: canManageTeam(role) },
+    { to: "/settings", label: "Settings", icon: Settings2, visible: canViewSettings(role) }
+  ].filter((item) => item.visible);
+
   return (
     <aside className="hidden border-r border-white/50 bg-white/70 p-6 backdrop-blur-xl lg:block">
       <div className="mb-8">
