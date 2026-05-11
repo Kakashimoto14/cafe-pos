@@ -4,6 +4,7 @@ export type DiscountScope = "senior" | "pwd" | "promo" | "manual";
 export type DiscountValueType = "fixed" | "percent";
 export type PaymentProvider = "cash" | "card" | "gcash" | "maya" | "qr" | "instapay" | "other";
 export type InventoryAdjustmentType = "stock_in" | "stock_out" | "manual" | "sale" | "waste";
+export type IngredientAdjustmentType = InventoryAdjustmentType;
 
 export type MenuProduct = {
   id: string;
@@ -18,6 +19,8 @@ export type MenuProduct = {
   lowStockThreshold: number;
   tags: string[];
   isActive: boolean;
+  hasRecipe?: boolean;
+  hasAddons?: boolean;
 };
 
 export type PaymentSummary = {
@@ -72,11 +75,146 @@ export type InventoryAdjustmentRecord = {
   createdAt: string;
 };
 
+export type IngredientRecord = {
+  id: string;
+  sku: string;
+  name: string;
+  category: string;
+  unit: string;
+  quantityOnHand: number;
+  lowStockThreshold: number;
+  costPerUnit: number;
+  supplier?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type IngredientFormValues = {
+  id?: string;
+  sku: string;
+  name: string;
+  category: string;
+  unit: string;
+  quantityOnHand: number;
+  lowStockThreshold: number;
+  costPerUnit: number;
+  supplier: string;
+  isActive: boolean;
+};
+
+export type ProductIngredientRecord = {
+  id: string;
+  productId: string;
+  productName?: string;
+  ingredientId: string;
+  ingredientName: string;
+  ingredientUnit: string;
+  quantityRequired: number;
+  costPerUnit: number;
+  createdAt?: string;
+};
+
+export type ProductIngredientFormValues = {
+  id?: string;
+  productId: string;
+  ingredientId: string;
+  quantityRequired: number;
+};
+
+export type IngredientAdjustmentRecord = {
+  id: string;
+  ingredientId: string;
+  ingredientName: string;
+  ingredientUnit: string;
+  userId: string;
+  userName: string;
+  adjustmentType: IngredientAdjustmentType;
+  quantityDelta: number;
+  previousQuantity: number;
+  newQuantity: number;
+  reason?: string;
+  referenceOrderId?: string;
+  createdAt: string;
+};
+
+export type ProductAddonRecord = {
+  id: string;
+  name: string;
+  sku: string;
+  description?: string;
+  priceDelta: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ProductAddonFormValues = {
+  id?: string;
+  name: string;
+  sku: string;
+  description: string;
+  priceDelta: number;
+  isActive: boolean;
+};
+
+export type ProductAddonIngredientRecord = {
+  id: string;
+  addonId: string;
+  addonName?: string;
+  ingredientId: string;
+  ingredientName: string;
+  ingredientUnit: string;
+  quantityRequired: number;
+  costPerUnit: number;
+  createdAt?: string;
+};
+
+export type ProductAddonIngredientFormValues = {
+  id?: string;
+  addonId: string;
+  ingredientId: string;
+  quantityRequired: number;
+};
+
+export type ProductAddonLinkRecord = {
+  id: string;
+  productId: string;
+  productName: string;
+  addonId: string;
+  addonName: string;
+  createdAt?: string;
+};
+
+export type ProductAddonLinkFormValues = {
+  id?: string;
+  productId: string;
+  addonId: string;
+};
+
+export type OrderItemAddonRecord = {
+  id: string;
+  orderItemId: string;
+  addonId: string;
+  addonName: string;
+  priceDelta: number;
+  quantity: number;
+  createdAt?: string;
+};
+
+export type CartItemAddon = {
+  addonId: string;
+  name: string;
+  priceDelta: number;
+  quantity: number;
+};
+
 export type DashboardSummary = {
   revenueToday: number;
   ordersToday: number;
   activeProducts: number;
   lowStockItems: MenuProduct[];
+  lowStockIngredients?: IngredientRecord[];
   recentOrders: OrderListItem[];
 };
 
@@ -98,6 +236,7 @@ export type OrderLineItem = {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  addons?: OrderItemAddonRecord[];
 };
 
 export type OrderListItem = {
@@ -132,6 +271,10 @@ export type OrderPayload = {
   items: Array<{
     product_id: string;
     quantity: number;
+    addons?: Array<{
+      addon_id: string;
+      quantity: number;
+    }>;
   }>;
 };
 

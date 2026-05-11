@@ -1,14 +1,20 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, UserCog } from "lucide-react";
+import { ShieldCheck, UserCog, UserPlus } from "lucide-react";
 import type { AppRole } from "@cafe/shared-types";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
+import { useAuthStore } from "@/stores/auth-store";
 
 const roles: AppRole[] = ["admin", "manager", "cashier"];
 
 export function TeamPage() {
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((state) => state.user);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ fullName: "", email: "", role: "cashier" as AppRole, temporaryPassword: "" });
   const teamQuery = useQuery({
     queryKey: ["profiles"],
     queryFn: () => apiClient.listProfiles()
@@ -19,6 +25,17 @@ export function TeamPage() {
       apiClient.updateProfile(id, { role, isActive }),
     onSuccess: () => {
       toast.success("Team access updated.");
+      void queryClient.invalidateQueries({ queryKey: ["profiles"] });
+    },
+    onError: (error) => toast.error(error.message)
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: () => apiClient.createUser(newUser),
+    onSuccess: () => {
+      toast.success("User created.");
+      setAddUserOpen(false);
+      setNewUser({ fullName: "", email: "", role: "cashier", temporaryPassword: "" });
       void queryClient.invalidateQueries({ queryKey: ["profiles"] });
     },
     onError: (error) => toast.error(error.message)
@@ -36,9 +53,17 @@ export function TeamPage() {
 
   return (
     <div className="space-y-6">
-      <section>
-        <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Team</div>
-        <h1 className="mt-3 font-display text-4xl text-[#241610]">Team</h1>
+      <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Team</div>
+          <h1 className="mt-3 font-display text-4xl text-[#241610]">Team</h1>
+        </div>
+        {currentUser?.role === "admin" ? (
+          <Button type="button" onClick={() => setAddUserOpen(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add user
+          </Button>
+        ) : null}
       </section>
 
       <div className="grid gap-4">
@@ -91,6 +116,93 @@ export function TeamPage() {
           </Card>
         ))}
       </div>
+
+      {addUserOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">
+          <Card className="w-full max-w-xl border-[#eadbcb] bg-white p-6 md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Admin action</div>
+                <h2 className="mt-2 text-3xl font-semibold text-[#241610]">Add user</h2>
+              </div>
+              <button type="button" className="text-sm font-medium text-[#7b685c]" onClick={() => setAddUserOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <form
+              className="mt-6 grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+                  toast.error("Enter a valid email address.");
+                  return;
+                }
+
+                if (newUser.temporaryPassword.length < 8 || !/[A-Za-z]/.test(newUser.temporaryPassword) || !/\d/.test(newUser.temporaryPassword)) {
+                  toast.error("Temporary password needs at least 8 characters, 1 letter, and 1 number.");
+                  return;
+                }
+
+                createUserMutation.mutate();
+              }}
+            >
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#5f4637]">Full name</span>
+                <input
+                  value={newUser.fullName}
+                  onChange={(event) => setNewUser((state) => ({ ...state, fullName: event.target.value }))}
+                  className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4"
+                  required
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#5f4637]">Email</span>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(event) => setNewUser((state) => ({ ...state, email: event.target.value }))}
+                  className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4"
+                  required
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#5f4637]">Role</span>
+                <select
+                  value={newUser.role}
+                  onChange={(event) => setNewUser((state) => ({ ...state, role: event.target.value as AppRole }))}
+                  className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4"
+                >
+                  {roles.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-[#5f4637]">Temporary password</span>
+                <input
+                  type="password"
+                  value={newUser.temporaryPassword}
+                  onChange={(event) => setNewUser((state) => ({ ...state, temporaryPassword: event.target.value }))}
+                  className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4"
+                  required
+                />
+              </label>
+              <div className="flex gap-3">
+                <Button type="submit" disabled={createUserMutation.isPending}>
+                  {createUserMutation.isPending ? "Creating..." : "Create user"}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setAddUserOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

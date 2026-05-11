@@ -35,7 +35,7 @@ export function DashboardPage() {
     { label: "Revenue today", value: formatMoney(summary.revenueToday), detail: "Gross sales today", icon: Wallet },
     { label: "Orders today", value: `${summary.ordersToday}`, detail: "Closed tickets", icon: ReceiptText },
     { label: "Active products", value: `${summary.activeProducts}`, detail: "POS-ready items", icon: Coffee },
-    { label: "Low stock", value: `${summary.lowStockItems.length}`, detail: "Needs attention", icon: AlertTriangle }
+    { label: "Low stock", value: `${(summary.lowStockIngredients ?? []).length || summary.lowStockItems.length}`, detail: "Needs attention", icon: AlertTriangle }
   ];
 
   return (
@@ -88,13 +88,17 @@ export function DashboardPage() {
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Stock watch</div>
           <h3 className="mt-2 text-2xl font-semibold text-[#241610]">Low inventory list</h3>
           <div className="mt-4 space-y-3 text-sm text-[#7b685c]">
-            {summary.lowStockItems.length === 0 ? (
-              <div className="rounded-2xl bg-[#fffaf4] p-4 text-[#7b685c]">All active menu items are comfortably stocked.</div>
+            {(summary.lowStockIngredients ?? []).length === 0 && summary.lowStockItems.length === 0 ? (
+              <div className="rounded-2xl bg-[#fffaf4] p-4 text-[#7b685c]">All tracked ingredients are comfortably stocked.</div>
             ) : (
-              summary.lowStockItems.map((product) => (
-                <div key={product.id} className="rounded-2xl border border-[#f0e4d6] bg-[#fffaf4] p-4">
-                  <div className="font-medium text-[#241610]">{product.name}</div>
-                  <div className="mt-1 text-[#7b685c]">{product.category} / {product.stockQuantity} remaining</div>
+              ((summary.lowStockIngredients ?? []).length > 0 ? summary.lowStockIngredients ?? [] : summary.lowStockItems).map((item) => (
+                <div key={item.id} className="rounded-2xl border border-[#f0e4d6] bg-[#fffaf4] p-4">
+                  <div className="font-medium text-[#241610]">{item.name}</div>
+                  <div className="mt-1 text-[#7b685c]">
+                    {"quantityOnHand" in item
+                      ? `${item.category} / ${item.quantityOnHand} ${item.unit} remaining`
+                      : `${item.category} / ${item.stockQuantity} remaining`}
+                  </div>
                 </div>
               ))
             )}

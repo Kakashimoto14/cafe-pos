@@ -12,6 +12,7 @@ import { ProductImage } from "@/components/products/ProductImage";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { canManageCatalog } from "@/utils/roles";
+import { Link } from "react-router-dom";
 
 const productSchema = z.object({
   id: z.string().optional(),
@@ -317,6 +318,14 @@ export function ProductsPage() {
                     Stock {product.stockQuantity}
                   </span>
                 </div>
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className={`rounded-full px-3 py-1 ${product.hasRecipe ? "bg-[#edf7ed] text-emerald-800" : "bg-[#fff2e7] text-[#a14f43]"}`}>
+                    {product.hasRecipe ? "Recipe linked" : "No recipe"}
+                  </span>
+                  <span className={`rounded-full px-3 py-1 ${product.hasAddons ? "bg-[#f3e7d8] text-[#7a4a2e]" : "bg-[#fffaf4] text-[#7b685c]"}`}>
+                    {product.hasAddons ? "Add-ons available" : "No add-ons"}
+                  </span>
+                </div>
                 {product.stockQuantity <= product.lowStockThreshold ? (
                   <div className="rounded-2xl bg-[#fff2e7] px-3 py-2 text-xs font-semibold text-[#a14f43]">
                     Low stock threshold: {product.lowStockThreshold}
@@ -364,6 +373,11 @@ export function ProductsPage() {
                       {product.isActive ? "Archive" : "Restore"}
                     </Button>
                   </div>
+                ) : null}
+                {canEdit ? (
+                  <Link to="/inventory" className="text-sm font-semibold text-[#7a4a2e] hover:text-[#5b341f]">
+                    Manage recipe in Inventory
+                  </Link>
                 ) : null}
               </div>
             </Card>

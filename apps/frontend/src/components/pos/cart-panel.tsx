@@ -39,6 +39,10 @@ function getCheckoutErrorMessage(error: Error) {
     return message;
   }
 
+  if (/insufficient ingredient stock/i.test(message)) {
+    return message;
+  }
+
   if (/payment reference/i.test(message)) {
     return "Enter the wallet or bank reference number before completing this order.";
   }
@@ -123,7 +127,11 @@ export function CartPanel() {
         notes: orderNotes.trim() || undefined,
         items: cart.map((item) => ({
           product_id: item.product.id,
-          quantity: item.quantity
+          quantity: item.quantity,
+          addons: item.addons.map((addon) => ({
+            addon_id: addon.addonId,
+            quantity: addon.quantity
+          }))
         }))
       });
     },
@@ -140,6 +148,8 @@ export function CartPanel() {
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["products"] });
       void queryClient.invalidateQueries({ queryKey: ["inventory-adjustments"] });
+      void queryClient.invalidateQueries({ queryKey: ["ingredients"] });
+      void queryClient.invalidateQueries({ queryKey: ["ingredient-adjustments"] });
       void queryClient.invalidateQueries({ queryKey: ["sales"] });
     },
     onError: (error) => {
@@ -191,14 +201,27 @@ export function CartPanel() {
               Add products to begin a new ticket.
             </div>
           ) : (
-            cart.map((item) => (
-              <div key={item.product.id} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+            cart.map((item) => {
+              const addonTotal = item.addons.reduce((sum, addon) => sum + addon.priceDelta * addon.quantity, 0);
+
+              return (
+              <div key={item.key} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium text-[#241610]">{item.product.name}</div>
                     <div className="mt-1 text-sm text-[#7b685c]">{formatMoney(item.product.price)} each</div>
+                    {item.addons.length > 0 ? (
+                      <div className="mt-2 space-y-1 text-sm text-[#7b685c]">
+                        {item.addons.map((addon) => (
+                          <div key={addon.addonId}>
+                            + {addon.name}
+                            {addon.quantity > 1 ? ` x${addon.quantity}` : ""} / {formatMoney(addon.priceDelta * addon.quantity)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                  <button className="text-sm font-semibold text-[#a14f43]" type="button" onClick={() => removeItem(item.product.id)}>
+                  <button className="text-sm font-semibold text-[#a14f43]" type="button" onClick={() => removeItem(item.key)}>
                     Remove
                   </button>
                 </div>
@@ -206,7 +229,7 @@ export function CartPanel() {
                   <div className="inline-flex items-center gap-2 rounded-full border border-[#eadbcb] bg-white px-2 py-1">
                     <button
                       type="button"
-                      onClick={() => updateItemQuantity(item.product.id, item.quantity - 1)}
+                      onClick={() => updateItemQuantity(item.key, item.quantity - 1)}
                       className="rounded-full p-1 text-[#7a4a2e] hover:bg-[#f3e7d8]"
                     >
                       <Minus className="h-4 w-4" />
@@ -214,16 +237,17 @@ export function CartPanel() {
                     <span className="min-w-8 text-center text-sm font-semibold text-[#241610]">{item.quantity}</span>
                     <button
                       type="button"
-                      onClick={() => updateItemQuantity(item.product.id, item.quantity + 1)}
+                      onClick={() => updateItemQuantity(item.key, item.quantity + 1)}
                       className="rounded-full p-1 text-[#7a4a2e] hover:bg-[#f3e7d8]"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="text-sm font-semibold text-[#241610]">{formatMoney(item.product.price * item.quantity)}</div>
+                  <div className="text-sm font-semibold text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity)}</div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -427,15 +451,29 @@ export function CartPanel() {
                 <h5 className="mt-1 text-xl font-semibold text-[#241610]">Ready to charge</h5>
 
                 <div className="mt-5 space-y-3 rounded-[24px] border border-[#eadbcb] bg-white p-4">
-                  {cart.map((item) => (
-                    <div key={item.product.id} className="flex items-center justify-between gap-3 text-sm">
+                  {cart.map((item) => {
+                    const addonTotal = item.addons.reduce((sum, addon) => sum + addon.priceDelta * addon.quantity, 0);
+
+                    return (
+                    <div key={item.key} className="flex items-start justify-between gap-3 text-sm">
                       <div>
                         <div className="font-medium text-[#241610]">{item.product.name}</div>
                         <div className="text-[#7b685c]">Qty {item.quantity}</div>
+                        {item.addons.length > 0 ? (
+                          <div className="mt-1 space-y-0.5 text-xs text-[#7b685c]">
+                            {item.addons.map((addon) => (
+                              <div key={addon.addonId}>
+                                + {addon.name}
+                                {addon.quantity > 1 ? ` x${addon.quantity}` : ""}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="font-medium text-[#241610]">{formatMoney(item.product.price * item.quantity)}</div>
+                      <div className="font-medium text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity)}</div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-5 space-y-2 text-sm">

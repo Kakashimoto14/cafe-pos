@@ -110,10 +110,20 @@ export function OrdersPage() {
 
               <div className="mt-5 space-y-3 rounded-3xl border border-[#f0e4d6] bg-[#fffaf4] p-4">
                 {order.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 text-sm">
+                  <div key={item.id} className="flex items-start justify-between gap-3 text-sm">
                     <div>
                       <div className="font-medium text-[#241610]">{item.productName}</div>
                       <div className="text-[#7b685c]">Qty {item.quantity}</div>
+                      {item.addons && item.addons.length > 0 ? (
+                        <div className="mt-1 space-y-0.5 text-xs text-[#7b685c]">
+                          {item.addons.map((addon) => (
+                            <div key={addon.id}>
+                              + {addon.addonName}
+                              {addon.quantity > 1 ? ` x${addon.quantity}` : ""}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="text-right text-[#6c584b]">{formatMoney(item.lineTotal)}</div>
                   </div>

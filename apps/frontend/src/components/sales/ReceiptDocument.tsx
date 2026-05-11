@@ -56,6 +56,16 @@ export function ReceiptDocument({ order }: ReceiptDocumentProps) {
                 <div className="text-[#7b685c]">
                   {item.quantity} x {formatMoney(item.unitPrice)}
                 </div>
+                {item.addons && item.addons.length > 0 ? (
+                  <div className="mt-1 space-y-0.5 text-[#7b685c]">
+                    {item.addons.map((addon) => (
+                      <div key={addon.id}>
+                        + {addon.addonName}
+                        {addon.quantity > 1 ? ` x${addon.quantity}` : ""} / {formatMoney(addon.priceDelta * addon.quantity)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="font-medium">{formatMoney(item.lineTotal)}</div>
             </div>
