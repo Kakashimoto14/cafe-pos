@@ -5,13 +5,21 @@ import { Toaster } from "sonner";
 import { RouterProvider } from "react-router-dom";
 import { AuthBootstrap } from "@/components/auth/AuthBootstrap";
 import { router } from "@/router";
+import { isSetupRequiredError } from "@/services/api-client";
 import "@/styles/index.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      refetchOnWindowFocus: false
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        if (isSetupRequiredError(error)) {
+          return false;
+        }
+
+        return failureCount < 2;
+      }
     }
   }
 });

@@ -28,6 +28,21 @@ import type {
 } from "@cafe/shared-types";
 import { supabase } from "@/lib/supabase";
 
+export class SupabaseSchemaSetupError extends Error {
+  constructor(message = "Supabase tables or relationships are not available yet. Apply the latest Supabase migration.") {
+    super(message);
+    this.name = "SupabaseSchemaSetupError";
+  }
+}
+
+type SupabaseMaybeError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+  status?: number;
+};
+
 type ProfileRow = {
   id: string;
   email: string;
@@ -203,6 +218,31 @@ type OrderItemAddonRow = {
   quantity: number;
   created_at?: string;
 };
+
+export function isSetupRequiredError(error: unknown) {
+  return error instanceof SupabaseSchemaSetupError;
+}
+
+function isSupabaseSchemaError(error: SupabaseMaybeError | null | undefined) {
+  const text = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""} ${error?.hint ?? ""}`.toLowerCase();
+
+  return (
+    error?.status === 404 ||
+    ["pgrst200", "pgrst202", "pgrst204", "pgrst205"].includes((error?.code ?? "").toLowerCase()) ||
+    text.includes("schema cache") ||
+    text.includes("relationship") ||
+    text.includes("could not find") ||
+    text.includes("does not exist")
+  );
+}
+
+function throwSupabaseError(error: SupabaseMaybeError | null, setupMessage?: string): never {
+  if (isSupabaseSchemaError(error)) {
+    throw new SupabaseSchemaSetupError(setupMessage);
+  }
+
+  throw new Error(formatSupabaseError(error));
+}
 
 function formatSupabaseError(error: { message?: string } | null) {
   return error?.message ?? "Something went wrong while talking to Supabase.";
@@ -510,7 +550,7 @@ async function products(options: { activeOnly?: boolean } = {}) {
   let query = supabase
     .from("products")
     .select(
-      "id, sku, name, description, image_url, price_amount, stock_quantity, low_stock_threshold, is_active, category_id, categories(name), product_ingredients(id), product_addon_links(id)"
+      "id, sku, name, description, image_url, price_amount, stock_quantity, low_stock_threshold, is_active, category_id, categories(name)"
     )
     .order("name");
 
@@ -521,10 +561,50 @@ async function products(options: { activeOnly?: boolean } = {}) {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
-  return ((data ?? []) as unknown as ProductRow[]).map(mapProduct);
+  const rows = ((data ?? []) as unknown as ProductRow[]).map((row) => ({
+    ...row,
+    product_ingredients: [],
+    product_addon_links: []
+  }));
+
+  if (rows.length === 0) {
+    return rows.map(mapProduct);
+  }
+
+  try {
+    const [recipeResult, addonLinkResult] = await Promise.all([
+      supabase.from("product_ingredients").select("product_id"),
+      supabase.from("product_addon_links").select("product_id")
+    ]);
+
+    if (recipeResult.error && !isSupabaseSchemaError(recipeResult.error)) {
+      throw recipeResult.error;
+    }
+
+    if (addonLinkResult.error && !isSupabaseSchemaError(addonLinkResult.error)) {
+      throw addonLinkResult.error;
+    }
+
+    const productsWithRecipes = new Set(((recipeResult.data ?? []) as Array<{ product_id: string }>).map((row) => row.product_id));
+    const productsWithAddons = new Set(((addonLinkResult.data ?? []) as Array<{ product_id: string }>).map((row) => row.product_id));
+
+    return rows.map((row) =>
+      mapProduct({
+        ...row,
+        product_ingredients: productsWithRecipes.has(row.id) ? [{ id: "linked" }] : [],
+        product_addon_links: productsWithAddons.has(row.id) ? [{ id: "linked" }] : []
+      })
+    );
+  } catch (error) {
+    if (isSupabaseSchemaError(error as SupabaseMaybeError)) {
+      return rows.map(mapProduct);
+    }
+
+    throw new Error(formatSupabaseError(error as SupabaseMaybeError));
+  }
 }
 
 async function categories(options: { activeOnly?: boolean } = {}) {
@@ -537,7 +617,7 @@ async function categories(options: { activeOnly?: boolean } = {}) {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return (data as CategoryRow[]).map(mapCategory);
@@ -577,7 +657,7 @@ async function saveCategory(values: CategoryFormValues) {
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return mapCategory(data as CategoryRow);
@@ -587,7 +667,7 @@ async function toggleCategory(id: string, isActive: boolean) {
   const { error } = await supabase.from("categories").update({ is_active: isActive }).eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 }
 
@@ -634,7 +714,7 @@ async function toggleProduct(id: string, isActive: boolean) {
   const { error } = await supabase.from("products").update({ is_active: isActive }).eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 }
 
@@ -667,7 +747,7 @@ async function saveDiscount(values: DiscountFormValues) {
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return mapDiscount(data as DiscountRow);
@@ -677,7 +757,7 @@ async function toggleDiscount(id: string, isActive: boolean) {
   const { error } = await supabase.from("discounts").update({ is_active: isActive }).eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 }
 
@@ -694,7 +774,7 @@ async function createOrder(payload: OrderPayload) {
   });
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   const order = Array.isArray(data) ? data[0] : data;
@@ -706,29 +786,50 @@ async function createOrder(payload: OrderPayload) {
   };
 }
 
-function buildOrderSelect() {
+function buildOrderSelect(includeAddons = true) {
+  if (!includeAddons) {
+    return "id, order_number, order_type, payment_method, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_name, quantity, unit_price, line_total)";
+  }
+
   return "id, order_number, order_type, payment_method, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_name, quantity, unit_price, line_total, order_item_addons(id, order_item_id, addon_id, addon_name, price_delta, quantity, created_at))";
 }
 
 async function listOrders(limit = 24) {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("orders")
     .select(buildOrderSelect())
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  if (error && isSupabaseSchemaError(error)) {
+    const fallback = await supabase
+      .from("orders")
+      .select(buildOrderSelect(false))
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    data = fallback.data;
+    error = fallback.error;
+  }
+
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
 }
 
 async function getOrderById(id: string) {
-  const { data, error } = await supabase.from("orders").select(buildOrderSelect()).eq("id", id).single();
+  let { data, error } = await supabase.from("orders").select(buildOrderSelect()).eq("id", id).single();
+
+  if (error && isSupabaseSchemaError(error)) {
+    const fallback = await supabase.from("orders").select(buildOrderSelect(false)).eq("id", id).single();
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return mapOrder(data as unknown as OrderRow);
@@ -741,7 +842,7 @@ async function listProfiles() {
     .order("created_at");
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   return (data as ProfileRow[]).map(mapProfile);
@@ -790,7 +891,7 @@ async function adjustInventory(payload: {
   });
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
   }
 
   const result = Array.isArray(data) ? data[0] : data;
@@ -871,7 +972,7 @@ async function saveIngredient(values: IngredientFormValues) {
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
   }
 
   return mapIngredient(data as unknown as IngredientRow);
@@ -881,22 +982,42 @@ async function toggleIngredient(id: string, isActive: boolean) {
   const { error } = await supabase.from("ingredients").update({ is_active: isActive }).eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
   }
 }
 
 async function productIngredients(productId: string) {
   const { data, error } = await supabase
     .from("product_ingredients")
-    .select("id, product_id, ingredient_id, quantity_required, created_at, products(name), ingredients(name, unit, cost_per_unit)")
+    .select("id, product_id, ingredient_id, quantity_required, created_at")
     .eq("product_id", productId)
     .order("created_at");
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product recipe tables are not available yet. Apply the latest Supabase migration.");
   }
 
-  return ((data ?? []) as unknown as ProductIngredientRow[]).map(mapProductIngredient);
+  const rows = (data ?? []) as ProductIngredientRow[];
+  const ingredientIds = [...new Set(rows.map((row) => row.ingredient_id))];
+  const { data: ingredientData, error: ingredientError } =
+    ingredientIds.length > 0
+      ? await supabase.from("ingredients").select("id, name, unit, cost_per_unit").in("id", ingredientIds)
+      : { data: [], error: null };
+
+  if (ingredientError) {
+    throwSupabaseError(ingredientError, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
+  }
+
+  const ingredientMap = new Map(
+    ((ingredientData ?? []) as Array<{ id: string; name: string; unit: string; cost_per_unit: number | string }>).map((row) => [row.id, row])
+  );
+
+  return rows.map((row) =>
+    mapProductIngredient({
+      ...row,
+      ingredients: ingredientMap.get(row.ingredient_id) ?? null
+    })
+  );
 }
 
 async function saveProductIngredient(values: ProductIngredientFormValues) {
@@ -911,18 +1032,18 @@ async function saveProductIngredient(values: ProductIngredientFormValues) {
         .from("product_ingredients")
         .update(payload)
         .eq("id", values.id)
-        .select("id, product_id, ingredient_id, quantity_required, created_at, products(name), ingredients(name, unit, cost_per_unit)")
+        .select("id, product_id, ingredient_id, quantity_required, created_at")
         .single()
     : supabase
         .from("product_ingredients")
         .insert(payload)
-        .select("id, product_id, ingredient_id, quantity_required, created_at, products(name), ingredients(name, unit, cost_per_unit)")
+        .select("id, product_id, ingredient_id, quantity_required, created_at")
         .single();
 
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product recipe tables are not available yet. Apply the latest Supabase migration.");
   }
 
   return mapProductIngredient(data as unknown as ProductIngredientRow);
@@ -932,7 +1053,7 @@ async function deleteProductIngredient(id: string) {
   const { error } = await supabase.from("product_ingredients").delete().eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product recipe tables are not available yet. Apply the latest Supabase migration.");
   }
 }
 
@@ -950,7 +1071,7 @@ async function adjustIngredient(payload: {
   });
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
   }
 
   const result = Array.isArray(data) ? data[0] : data;
@@ -965,33 +1086,72 @@ async function ingredientAdjustments(limit = 50) {
   const { data, error } = await supabase
     .from("ingredient_adjustments")
     .select(
-      "id, ingredient_id, user_id, adjustment_type, quantity_delta, previous_quantity, new_quantity, reason, reference_order_id, created_at, ingredients(name, unit), profiles(full_name)"
+      "id, ingredient_id, user_id, adjustment_type, quantity_delta, previous_quantity, new_quantity, reason, reference_order_id, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
   }
 
-  return ((data ?? []) as unknown as IngredientAdjustmentRow[]).map(mapIngredientAdjustment);
+  const rows = (data ?? []) as IngredientAdjustmentRow[];
+  const ingredientIds = [...new Set(rows.map((row) => row.ingredient_id))];
+  const userIds = [...new Set(rows.map((row) => row.user_id))];
+  const [ingredientResult, profileResult] = await Promise.all([
+    ingredientIds.length > 0 ? supabase.from("ingredients").select("id, name, unit").in("id", ingredientIds) : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0 ? supabase.from("profiles").select("id, full_name").in("id", userIds) : Promise.resolve({ data: [], error: null })
+  ]);
+
+  if (ingredientResult.error) {
+    throwSupabaseError(ingredientResult.error, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
+  }
+
+  if (profileResult.error) {
+    throwSupabaseError(profileResult.error);
+  }
+
+  const ingredientMap = new Map(((ingredientResult.data ?? []) as Array<{ id: string; name: string; unit: string }>).map((row) => [row.id, row]));
+  const profileMap = new Map(((profileResult.data ?? []) as Array<{ id: string; full_name: string }>).map((row) => [row.id, row]));
+
+  return rows.map((row) =>
+    mapIngredientAdjustment({
+      ...row,
+      ingredients: ingredientMap.get(row.ingredient_id) ?? null,
+      profiles: profileMap.get(row.user_id) ?? null
+    })
+  );
 }
 
 async function productAddons(productId?: string) {
   if (productId) {
-    const { data, error } = await supabase
+    const { data: linkData, error: linkError } = await supabase
       .from("product_addon_links")
-      .select("id, product_id, addon_id, created_at, product_addons(id, name, sku, description, price_delta, is_active, created_at, updated_at)")
+      .select("addon_id")
       .eq("product_id", productId);
 
-    if (error) {
-      throw new Error(formatSupabaseError(error));
+    if (linkError) {
+      throwSupabaseError(linkError, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
     }
 
-    return ((data ?? []) as unknown as ProductAddonLinkRow[])
-      .map((row) => (Array.isArray(row.product_addons) ? row.product_addons[0] : row.product_addons))
-      .filter((row): row is ProductAddonRow => Boolean(row))
-      .map(mapProductAddon);
+    const addonIds = ((linkData ?? []) as Array<{ addon_id: string }>).map((row) => row.addon_id);
+
+    if (addonIds.length === 0) {
+      return [];
+    }
+
+    const { data: addonData, error: addonError } = await supabase
+      .from("product_addons")
+      .select("id, name, sku, description, price_delta, is_active, created_at, updated_at")
+      .in("id", addonIds)
+      .eq("is_active", true)
+      .order("name");
+
+    if (addonError) {
+      throwSupabaseError(addonError, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
+    }
+
+    return ((addonData ?? []) as unknown as ProductAddonRow[]).map(mapProductAddon);
   }
 
   const { data, error } = await supabase
@@ -1000,7 +1160,7 @@ async function productAddons(productId?: string) {
     .order("name");
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
   }
 
   return ((data ?? []) as unknown as ProductAddonRow[]).map(mapProductAddon);
@@ -1031,7 +1191,7 @@ async function saveAddon(values: ProductAddonFormValues) {
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
   }
 
   return mapProductAddon(data as unknown as ProductAddonRow);
@@ -1041,22 +1201,42 @@ async function toggleAddon(id: string, isActive: boolean) {
   const { error } = await supabase.from("product_addons").update({ is_active: isActive }).eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
   }
 }
 
 async function addonIngredients(addonId: string) {
   const { data, error } = await supabase
     .from("product_addon_ingredients")
-    .select("id, addon_id, ingredient_id, quantity_required, created_at, product_addons(name), ingredients(name, unit, cost_per_unit)")
+    .select("id, addon_id, ingredient_id, quantity_required, created_at")
     .eq("addon_id", addonId)
     .order("created_at");
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on ingredient tables are not available yet. Apply the latest Supabase migration.");
   }
 
-  return ((data ?? []) as unknown as ProductAddonIngredientRow[]).map(mapAddonIngredient);
+  const rows = (data ?? []) as ProductAddonIngredientRow[];
+  const ingredientIds = [...new Set(rows.map((row) => row.ingredient_id))];
+  const { data: ingredientData, error: ingredientError } =
+    ingredientIds.length > 0
+      ? await supabase.from("ingredients").select("id, name, unit, cost_per_unit").in("id", ingredientIds)
+      : { data: [], error: null };
+
+  if (ingredientError) {
+    throwSupabaseError(ingredientError, "Ingredient inventory tables are not available yet. Apply the latest Supabase migration.");
+  }
+
+  const ingredientMap = new Map(
+    ((ingredientData ?? []) as Array<{ id: string; name: string; unit: string; cost_per_unit: number | string }>).map((row) => [row.id, row])
+  );
+
+  return rows.map((row) =>
+    mapAddonIngredient({
+      ...row,
+      ingredients: ingredientMap.get(row.ingredient_id) ?? null
+    })
+  );
 }
 
 async function saveAddonIngredient(values: ProductAddonIngredientFormValues) {
@@ -1071,18 +1251,18 @@ async function saveAddonIngredient(values: ProductAddonIngredientFormValues) {
         .from("product_addon_ingredients")
         .update(payload)
         .eq("id", values.id)
-        .select("id, addon_id, ingredient_id, quantity_required, created_at, product_addons(name), ingredients(name, unit, cost_per_unit)")
+        .select("id, addon_id, ingredient_id, quantity_required, created_at")
         .single()
     : supabase
         .from("product_addon_ingredients")
         .insert(payload)
-        .select("id, addon_id, ingredient_id, quantity_required, created_at, product_addons(name), ingredients(name, unit, cost_per_unit)")
+        .select("id, addon_id, ingredient_id, quantity_required, created_at")
         .single();
 
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on ingredient tables are not available yet. Apply the latest Supabase migration.");
   }
 
   return mapAddonIngredient(data as unknown as ProductAddonIngredientRow);
@@ -1092,14 +1272,14 @@ async function deleteAddonIngredient(id: string) {
   const { error } = await supabase.from("product_addon_ingredients").delete().eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on ingredient tables are not available yet. Apply the latest Supabase migration.");
   }
 }
 
 async function productAddonLinks(productId?: string) {
   let query = supabase
     .from("product_addon_links")
-    .select("id, product_id, addon_id, created_at, products(name), product_addons(id, name, sku, description, price_delta, is_active, created_at, updated_at)")
+    .select("id, product_id, addon_id, created_at")
     .order("created_at");
 
   if (productId) {
@@ -1109,10 +1289,37 @@ async function productAddonLinks(productId?: string) {
   const { data, error } = await query;
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on link tables are not available yet. Apply the latest Supabase migration.");
   }
 
-  return ((data ?? []) as unknown as ProductAddonLinkRow[]).map(mapProductAddonLink);
+  const rows = (data ?? []) as ProductAddonLinkRow[];
+  const productIds = [...new Set(rows.map((row) => row.product_id))];
+  const addonIds = [...new Set(rows.map((row) => row.addon_id))];
+
+  const [productsResult, addonsResult] = await Promise.all([
+    productIds.length > 0 ? supabase.from("products").select("id, name").in("id", productIds) : Promise.resolve({ data: [], error: null }),
+    addonIds.length > 0 ? supabase.from("product_addons").select("id, name").in("id", addonIds) : Promise.resolve({ data: [], error: null })
+  ]);
+
+  if (productsResult.error && !isSupabaseSchemaError(productsResult.error)) {
+    throw new Error(formatSupabaseError(productsResult.error));
+  }
+
+  if (addonsResult.error) {
+    throwSupabaseError(addonsResult.error, "Product add-on tables are not available yet. Apply the latest Supabase migration.");
+  }
+
+  const productNames = new Map(((productsResult.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
+  const addonNames = new Map(((addonsResult.data ?? []) as Array<{ id: string; name: string }>).map((row) => [row.id, row.name]));
+
+  return rows.map((row) => ({
+    id: row.id,
+    productId: row.product_id,
+    productName: productNames.get(row.product_id) ?? "Unknown product",
+    addonId: row.addon_id,
+    addonName: addonNames.get(row.addon_id) ?? "Unknown add-on",
+    createdAt: row.created_at
+  }));
 }
 
 async function saveProductAddonLink(values: ProductAddonLinkFormValues) {
@@ -1126,28 +1333,35 @@ async function saveProductAddonLink(values: ProductAddonLinkFormValues) {
         .from("product_addon_links")
         .update(payload)
         .eq("id", values.id)
-        .select("id, product_id, addon_id, created_at, products(name), product_addons(id, name, sku, description, price_delta, is_active, created_at, updated_at)")
+        .select("id, product_id, addon_id, created_at")
         .single()
     : supabase
         .from("product_addon_links")
         .insert(payload)
-        .select("id, product_id, addon_id, created_at, products(name), product_addons(id, name, sku, description, price_delta, is_active, created_at, updated_at)")
+        .select("id, product_id, addon_id, created_at")
         .single();
 
   const { data, error } = await query;
 
   if (error || !data) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on link tables are not available yet. Apply the latest Supabase migration.");
   }
 
-  return mapProductAddonLink(data as unknown as ProductAddonLinkRow);
+  return {
+    id: (data as ProductAddonLinkRow).id,
+    productId: (data as ProductAddonLinkRow).product_id,
+    productName: "Product",
+    addonId: (data as ProductAddonLinkRow).addon_id,
+    addonName: "Add-on",
+    createdAt: (data as ProductAddonLinkRow).created_at
+  };
 }
 
 async function deleteProductAddonLink(id: string) {
   const { error } = await supabase.from("product_addon_links").delete().eq("id", id);
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error, "Product add-on link tables are not available yet. Apply the latest Supabase migration.");
   }
 }
 
@@ -1178,7 +1392,13 @@ async function dashboardSummary(): Promise<DashboardSummary> {
 
   const [activeProducts, activeIngredients, ordersToday, recentOrders] = await Promise.all([
     products({ activeOnly: true }),
-    ingredients({ activeOnly: true }),
+    ingredients({ activeOnly: true }).catch((error) => {
+      if (isSetupRequiredError(error)) {
+        return [];
+      }
+
+      throw error;
+    }),
     supabase
       .from("orders")
       .select("id, grand_total", { count: "exact" })
@@ -1215,10 +1435,26 @@ async function salesSummary(range?: { from?: string; to?: string }): Promise<Sal
     ordersQuery = ordersQuery.lte("created_at", new Date(range.to).toISOString());
   }
 
-  const { data, error } = await ordersQuery;
+  let { data, error } = await ordersQuery;
+
+  if (error && isSupabaseSchemaError(error)) {
+    let fallbackQuery = supabase.from("orders").select(buildOrderSelect(false)).order("created_at", { ascending: false }).limit(100);
+
+    if (range?.from) {
+      fallbackQuery = fallbackQuery.gte("created_at", new Date(range.from).toISOString());
+    }
+
+    if (range?.to) {
+      fallbackQuery = fallbackQuery.lte("created_at", new Date(range.to).toISOString());
+    }
+
+    const fallback = await fallbackQuery;
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) {
-    throw new Error(formatSupabaseError(error));
+    throwSupabaseError(error);
   }
 
   const orders = ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
