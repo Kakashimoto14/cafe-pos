@@ -83,11 +83,8 @@ export function DiscountsPage() {
       <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Discount controls</div>
-            <h1 className="mt-3 font-display text-4xl text-[#241610]">Manage promos and cafe discounts</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-              Configure senior, PWD, promo, and manager-only discounts that cashiers can apply safely at checkout.
-            </p>
+            <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Discounts</div>
+            <h1 className="mt-3 font-display text-4xl text-[#241610]">Discounts</h1>
           </div>
           <Button
             onClick={() => {

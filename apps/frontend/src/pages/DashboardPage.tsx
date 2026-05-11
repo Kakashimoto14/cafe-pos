@@ -32,20 +32,17 @@ export function DashboardPage() {
   }
 
   const metrics = [
-    { label: "Revenue today", value: formatMoney(summary.revenueToday), detail: "Gross sales booked this calendar day", icon: Wallet },
-    { label: "Orders today", value: `${summary.ordersToday}`, detail: "Tickets closed across active terminals", icon: ReceiptText },
-    { label: "Active products", value: `${summary.activeProducts}`, detail: "Items available to the POS grid", icon: Coffee },
-    { label: "Low stock", value: `${summary.lowStockItems.length}`, detail: "Products below the stock watch threshold", icon: AlertTriangle }
+    { label: "Revenue today", value: formatMoney(summary.revenueToday), detail: "Gross sales today", icon: Wallet },
+    { label: "Orders today", value: `${summary.ordersToday}`, detail: "Closed tickets", icon: ReceiptText },
+    { label: "Active products", value: `${summary.activeProducts}`, detail: "POS-ready items", icon: Coffee },
+    { label: "Low stock", value: `${summary.lowStockItems.length}`, detail: "Needs attention", icon: AlertTriangle }
   ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
-        <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Cozy Cafe POS</div>
-        <h1 className="mt-3 font-display text-4xl text-[#241610]">A clearer view of today&apos;s floor</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-          Track sales, watch low-stock items, and keep your service team aligned from one calm operations dashboard.
-        </p>
+        <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Cozy Cafe POS</div>
+        <h1 className="mt-3 font-display text-4xl text-[#241610]">Overview</h1>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -64,7 +61,7 @@ export function DashboardPage() {
       <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <Card className="border-[#eadbcb] bg-white p-6">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Latest tickets</div>
-          <h3 className="mt-2 text-2xl font-semibold text-[#241610]">Front counter pulse</h3>
+          <h3 className="mt-2 text-2xl font-semibold text-[#241610]">Recent orders</h3>
           <div className="mt-5 space-y-3">
             {summary.recentOrders.length === 0 ? (
               <div className="rounded-2xl bg-[#fffaf4] p-4 text-sm text-[#7b685c]">No tickets have been created yet.</div>

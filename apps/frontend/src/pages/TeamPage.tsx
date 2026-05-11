@@ -37,11 +37,8 @@ export function TeamPage() {
   return (
     <div className="space-y-6">
       <section>
-        <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Access control</div>
-        <h1 className="mt-3 font-display text-4xl text-[#241610]">Team accounts</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-          Admin-only workspace for assigning cashier, manager, and admin privileges.
-        </p>
+        <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Team</div>
+        <h1 className="mt-3 font-display text-4xl text-[#241610]">Team</h1>
       </section>
 
       <div className="grid gap-4">

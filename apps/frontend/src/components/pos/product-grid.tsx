@@ -4,6 +4,7 @@ import { Search, X } from "lucide-react";
 import type { CategoryRecord, MenuProduct } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
+import { ProductImage } from "@/components/products/ProductImage";
 import { usePosStore } from "@/stores/pos-store";
 
 type ProductGridProps = {
@@ -21,7 +22,7 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
     const matchesSearch =
       normalizedQuery.length === 0 ||
-      `${product.name} ${product.category} ${product.sku}`.toLowerCase().includes(normalizedQuery);
+      `${product.name} ${product.category} ${product.sku} ${product.description}`.toLowerCase().includes(normalizedQuery);
     const matchesCategory = selectedCategory === "all" || product.categoryId === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -69,7 +70,7 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
           </button>
         ))}
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {filtered.length === 0 ? (
           <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
             No products found. Try another name, category, SKU, or barcode.
@@ -89,37 +90,40 @@ export function ProductGrid({ products, categories }: ProductGridProps) {
                 toast.error(`Only ${product.stockQuantity} ${product.name} available in stock.`);
               }
             }}
-            className="text-left"
+            className="h-full min-w-0 text-left disabled:cursor-not-allowed disabled:opacity-60"
             disabled={product.stockQuantity <= 0}
           >
-            <Card className="overflow-hidden border-[#eadbcb] bg-white transition-shadow hover:shadow-[0_20px_38px_rgba(74,43,24,0.11)] disabled:cursor-not-allowed">
-              {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="h-32 w-full object-cover md:h-36" />
-              ) : (
-                <div className="grid h-32 place-items-center bg-[#f8f0e7] text-sm text-[#7b685c] md:h-36">No image</div>
-              )}
-              <div className="space-y-2.5 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">{product.category}</div>
-                    <h3 className="mt-1 text-base font-semibold text-[#241610]">{product.name}</h3>
+            <Card className="flex h-full min-h-[360px] overflow-hidden border-[#eadbcb] bg-white transition-shadow hover:shadow-[0_20px_38px_rgba(74,43,24,0.11)]">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <ProductImage src={product.imageUrl} alt={product.name} className="aspect-[4/3] w-full shrink-0" />
+                <div className="flex min-w-0 flex-1 flex-col gap-3 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">
+                      {product.category}
+                    </div>
+                    <div className="shrink-0 rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
+                      PHP {product.price.toFixed(2)}
+                    </div>
                   </div>
-                  <div className="shrink-0 rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
-                    PHP {product.price.toFixed(2)}
+                  <h3 className="line-clamp-2 min-h-[3rem] text-lg font-semibold leading-6 text-[#241610]">{product.name}</h3>
+                  <p className="line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-[#7b685c]">{product.description}</p>
+                  <div className="mt-auto flex items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-xs font-medium uppercase tracking-[0.16em] text-[#a69080]">{product.sku}</div>
+                    <div
+                      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        product.stockQuantity <= product.lowStockThreshold
+                          ? "border-[#e4c8b0] bg-[#fff2e7] text-[#a14f43]"
+                          : "border-[#eadbcb] text-[#6c584b]"
+                      }`}
+                    >
+                      Stock {product.stockQuantity}
+                    </div>
                   </div>
-                </div>
-                <p className="line-clamp-2 text-sm leading-5 text-[#7b685c]">{product.description}</p>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a69080]">{product.sku}</div>
-                  <div
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                      product.stockQuantity <= product.lowStockThreshold
-                        ? "border-[#e4c8b0] bg-[#fff2e7] text-[#a14f43]"
-                        : "border-[#eadbcb] text-[#6c584b]"
-                    }`}
-                  >
-                    Stock {product.stockQuantity}
-                  </div>
+                  {product.stockQuantity <= product.lowStockThreshold ? (
+                    <div className="rounded-2xl bg-[#fff2e7] px-3 py-2 text-xs font-semibold text-[#a14f43]">
+                      Low stock threshold: {product.lowStockThreshold}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </Card>

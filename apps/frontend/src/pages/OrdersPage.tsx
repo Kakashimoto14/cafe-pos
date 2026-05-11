@@ -21,14 +21,6 @@ export function OrdersPage() {
     queryFn: () => apiClient.listOrders()
   });
 
-  if (ordersQuery.isLoading) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading recent tickets...</Card>;
-  }
-
-  if (ordersQuery.isError) {
-    return <Card className="p-6 text-sm text-rose-500">{ordersQuery.error.message}</Card>;
-  }
-
   const orders = ordersQuery.data ?? [];
   const filteredOrders = useMemo(() => {
     const normalized = deferredQuery.trim().toLowerCase();
@@ -53,15 +45,20 @@ export function OrdersPage() {
     );
   }, [deferredQuery, orders]);
 
+  if (ordersQuery.isLoading) {
+    return <Card className="p-6 text-sm text-[#7b685c]">Loading recent tickets...</Card>;
+  }
+
+  if (ordersQuery.isError) {
+    return <Card className="p-6 text-sm text-rose-500">{ordersQuery.error.message}</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Sales history</div>
-          <h1 className="mt-3 font-display text-4xl text-[#241610]">Recent orders</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-            Cashiers see their own tickets. Managers and admins can review the whole floor.
-          </p>
+          <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Orders</div>
+          <h1 className="mt-3 font-display text-4xl text-[#241610]">Orders</h1>
         </div>
         <div className="flex w-full items-center gap-3 rounded-[24px] border border-[#eadbcb] bg-white px-4 py-3 shadow-[0_14px_28px_rgba(74,43,24,0.06)] md:max-w-md">
           <Search className="h-5 w-5 text-[#9a8170]" />

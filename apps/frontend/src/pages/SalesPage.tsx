@@ -76,11 +76,8 @@ export function SalesPage() {
       <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Sales intelligence</div>
-            <h1 className="mt-3 font-display text-4xl text-[#241610]">Track daily cafe performance</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-              Review ticket volume, sales totals, and top-selling products without leaving the Cozy Cafe POS workspace.
-            </p>
+            <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Sales</div>
+            <h1 className="mt-3 font-display text-4xl text-[#241610]">Sales</h1>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-2">
@@ -110,7 +107,7 @@ export function SalesPage() {
       <section className="grid gap-6 xl:grid-cols-[1.15fr_1fr]">
         <Card className="border-[#eadbcb] bg-white p-5">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Top sellers</div>
-          <h2 className="mt-2 text-2xl font-semibold text-[#241610]">What is moving today</h2>
+          <h2 className="mt-2 text-2xl font-semibold text-[#241610]">Top items</h2>
           <div className="mt-5 space-y-3">
             {summary.topItems.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
@@ -139,7 +136,7 @@ export function SalesPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Recent transactions</div>
-              <h2 className="mt-2 text-2xl font-semibold text-[#241610]">Latest completed tickets</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-[#241610]">Recent transactions</h2>
             </div>
             <div className="flex items-center gap-3 rounded-[22px] border border-[#eadbcb] bg-white px-4 py-3 md:w-72">
               <Search className="h-4 w-4 text-[#9a8170]" />

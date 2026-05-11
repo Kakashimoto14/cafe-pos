@@ -87,11 +87,8 @@ export function InventoryPage() {
       <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Inventory control</div>
-            <h1 className="mt-3 font-display text-4xl text-[#241610]">Stock rooms and counter-ready items</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-              Adjust quantities, watch low-stock products, and keep a clean movement history tied to each operator.
-            </p>
+            <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Inventory</div>
+            <h1 className="mt-3 font-display text-4xl text-[#241610]">Inventory</h1>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card className="border-[#eadbcb] bg-white px-4 py-4">

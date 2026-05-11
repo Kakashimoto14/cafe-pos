@@ -45,8 +45,8 @@ const ReceiptPage = lazy(async () => ({
   default: (await import("@/pages/ReceiptPage")).ReceiptPage
 }));
 
-const PlaceholderPage = lazy(async () => ({
-  default: (await import("@/pages/PlaceholderPage")).PlaceholderPage
+const SettingsPage = lazy(async () => ({
+  default: (await import("@/pages/SettingsPage")).SettingsPage
 }));
 
 export const router = createBrowserRouter([
@@ -100,7 +100,7 @@ export const router = createBrowserRouter([
               </RequireRole>
             )
           },
-          { path: "settings", element: <PlaceholderPage title="Settings" /> }
+          { path: "settings", element: <SettingsPage /> }
         ]
       },
       {

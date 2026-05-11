@@ -8,6 +8,7 @@ import type { CategoryFormValues, ProductFormValues } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ProductImage } from "@/components/products/ProductImage";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { canManageCatalog } from "@/utils/roles";
@@ -159,14 +160,11 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
+      <section className="rounded-[28px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-5 shadow-[0_18px_38px_rgba(74,43,24,0.07)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.3em] text-[#8f7767]">Catalog control</div>
-            <h1 className="mt-3 font-display text-4xl text-[#241610]">Products and categories</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#7b685c]">
-              Shape the menu your cashiers see, manage product visibility, and keep pricing polished for the front counter.
-            </p>
+            <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Catalog</div>
+            <h1 className="mt-2 font-display text-3xl text-[#241610]">Product Catalog</h1>
           </div>
 
           {canEdit ? (
@@ -198,7 +196,7 @@ export function ProductsPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
-        <Card className="border-[#eadbcb] bg-white p-5">
+        <Card className="border-[#eadbcb] bg-white p-5 xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Categories</div>
           <div className="mt-4 space-y-3">
             {categoriesQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading categories...</div> : null}
@@ -294,32 +292,36 @@ export function ProductsPage() {
           ) : null}
 
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden border-[#eadbcb] bg-white">
-              {product.imageUrl ? (
-                <img src={product.imageUrl} alt={product.name} className="h-44 w-full object-cover" />
-              ) : (
-                <div className="grid h-44 place-items-center bg-[#f8f0e7] text-sm text-[#7b685c]">No product image</div>
-              )}
-              <div className="space-y-4 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">{product.category}</div>
-                    <h2 className="mt-2 text-xl font-semibold text-[#241610]">{product.name}</h2>
-                  </div>
-                  <div className="rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
+            <Card key={product.id} className="flex min-h-[430px] flex-col overflow-hidden border-[#eadbcb] bg-white">
+              <ProductImage src={product.imageUrl} alt={product.name} className="aspect-[16/10] w-full shrink-0" />
+              <div className="flex min-w-0 flex-1 flex-col gap-4 p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 truncate text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">{product.category}</div>
+                  <div className="shrink-0 rounded-full bg-[#f3e7d8] px-3 py-1 text-sm font-semibold text-[#7a4a2e]">
                     {formatMoney(product.price)}
                   </div>
                 </div>
 
-                <p className="text-sm leading-6 text-[#7b685c]">{product.description}</p>
+                <h2 className="line-clamp-2 min-h-[3.5rem] text-xl font-semibold leading-7 text-[#241610]">{product.name}</h2>
+                <p className="line-clamp-2 min-h-[3rem] text-sm leading-6 text-[#7b685c]">{product.description}</p>
 
-                <div className="flex items-center justify-between text-sm">
-                  <span className="rounded-full border border-[#eadbcb] px-3 py-1 font-medium text-[#6c584b]">SKU {product.sku}</span>
-                  <span className={product.stockQuantity <= product.lowStockThreshold ? "font-semibold text-[#a36d40]" : "text-[#6c584b]"}>
+                <div className="mt-auto flex items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate rounded-full border border-[#eadbcb] px-3 py-1 font-medium text-[#6c584b]">
+                    SKU {product.sku}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 font-semibold ${
+                      product.stockQuantity <= product.lowStockThreshold ? "bg-[#fff2e7] text-[#a14f43]" : "bg-[#fffaf4] text-[#6c584b]"
+                    }`}
+                  >
                     Stock {product.stockQuantity}
                   </span>
                 </div>
-                <div className="text-sm text-[#7b685c]">Low-stock threshold: {product.lowStockThreshold}</div>
+                {product.stockQuantity <= product.lowStockThreshold ? (
+                  <div className="rounded-2xl bg-[#fff2e7] px-3 py-2 text-xs font-semibold text-[#a14f43]">
+                    Low stock threshold: {product.lowStockThreshold}
+                  </div>
+                ) : null}
 
                 {canEdit ? (
                   <div className="flex gap-2">

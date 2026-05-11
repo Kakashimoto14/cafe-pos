@@ -27,34 +27,25 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="hidden border-r border-[#eadbcb] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,245,238,0.94))] p-6 backdrop-blur-xl lg:flex lg:flex-col">
-        <div className="mb-8">
-          <div className="rounded-[28px] border border-[#eadbcb] bg-white/95 p-4 shadow-[0_20px_40px_rgba(74,43,24,0.07)]">
-            <BrandLogo className="h-24 rounded-3xl bg-white object-contain" />
-            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.28em] text-[#8f7767]">Cozy Cafe POS</div>
-            <h1 className="mt-2 font-display text-2xl text-[#241610]">Cafe operations hub</h1>
-            <p className="mt-3 text-sm leading-6 text-[#7b685c]">
-              Counter service, stock tracking, and sales visibility in one warm, connected workspace.
-            </p>
-          </div>
-
-          <div className="mt-6 rounded-[24px] border border-[#eadbcb] bg-[#fffaf4] p-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Shift status</div>
-            <div className="mt-2 text-lg font-semibold text-[#3b2418]">Counter ready</div>
-            <p className="mt-2 text-sm leading-6 text-[#7b685c]">
-              Products, discounts, and live sales are synced to your Supabase workspace.
-            </p>
+      <aside className="sticky top-0 hidden h-screen overflow-hidden border-r border-[#eadbcb] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,245,238,0.96))] p-4 backdrop-blur-xl lg:flex lg:flex-col">
+        <div className="shrink-0 rounded-[24px] border border-[#eadbcb] bg-white/95 p-4 shadow-[0_16px_34px_rgba(74,43,24,0.07)]">
+          <div className="flex items-center gap-3">
+            <BrandLogo variant="mark" markClassName="h-14 w-14" />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8f7767]">Cozy Cafe</div>
+              <div className="mt-1 font-display text-xl text-[#241610]">POS</div>
+            </div>
           </div>
         </div>
 
-        <nav className="space-y-2">
+        <nav className="my-4 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
           {items.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors",
                   isActive
                     ? "border border-[#d9c2ac] bg-[#f3e7d8] text-[#3b2418] shadow-[0_8px_24px_rgba(122,74,46,0.08)]"
                     : "text-[#6c584b] hover:bg-[#f7efe5] hover:text-[#3b2418]"
@@ -67,13 +58,19 @@ export function Sidebar() {
           ))}
         </nav>
 
-        <div className="mt-auto rounded-[24px] border border-[#eadbcb] bg-white/95 p-4">
+        <div className="shrink-0 rounded-[24px] border border-[#eadbcb] bg-white/95 p-4 shadow-[0_16px_34px_rgba(74,43,24,0.06)]">
           <div className="flex items-center gap-3">
-            <BrandLogo variant="mark" markClassName="h-12 w-12" />
-            <div>
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#f3e7d8] text-sm font-bold uppercase text-[#7a4a2e]">
+              {(user?.name ?? "Cafe Operator")
+                .split(" ")
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)}
+            </div>
+            <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8f7767]">{user?.role ?? "operator"}</div>
-              <div className="mt-1 font-semibold text-[#241610]">{user?.name ?? "Cafe operator"}</div>
-              <div className="mt-1 text-sm text-[#7b685c]">{user?.email ?? "workspace@cozycafe.local"}</div>
+              <div className="mt-1 truncate font-semibold text-[#241610]">{user?.name ?? "Cafe operator"}</div>
+              <div className="mt-1 truncate text-sm text-[#7b685c]">{user?.email ?? "workspace@cozycafe.local"}</div>
             </div>
           </div>
         </div>
