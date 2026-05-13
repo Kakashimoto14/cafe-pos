@@ -22,7 +22,9 @@ type PosState = {
   selectedDiscount: DiscountRecord | null;
   paymentDraft: PaymentDraft;
   paymentSummary: PaymentSummary;
+  taxRate: number;
   setChannel: (channel: OrderChannel) => void;
+  setTaxRate: (taxRate: number) => void;
   addItem: (product: MenuProduct, addons?: CartItemAddon[]) => boolean;
   updateItemQuantity: (itemKey: string, nextQuantity: number) => void;
   removeItem: (itemKey: string) => void;
@@ -62,14 +64,14 @@ function calculateDiscount(subtotal: number, discount: DiscountRecord | null) {
   return Math.min(subtotal, discount.valueAmount);
 }
 
-function buildSummary(cart: CartItem[], discount: DiscountRecord | null): PaymentSummary {
+function buildSummary(cart: CartItem[], discount: DiscountRecord | null, taxRate = 12): PaymentSummary {
   const subtotal = cart.reduce((sum, item) => {
     const addonTotal = item.addons.reduce((addonSum, addon) => addonSum + addon.priceDelta * addon.quantity, 0);
     return sum + (item.product.price + addonTotal) * item.quantity;
   }, 0);
   const discountTotal = calculateDiscount(subtotal, discount);
   const taxableSubtotal = Number(Math.max(subtotal - discountTotal, 0).toFixed(2));
-  const taxTotal = Number((taxableSubtotal * 0.12).toFixed(2));
+  const taxTotal = Number((taxableSubtotal * (taxRate / 100)).toFixed(2));
 
   return {
     subtotal: Number(subtotal.toFixed(2)),
@@ -105,7 +107,28 @@ export const usePosStore = create<PosState>((set) => ({
   selectedDiscount: null,
   paymentDraft: defaultPaymentDraft,
   paymentSummary: emptySummary,
+  taxRate: 12,
   setChannel: (channel) => set({ channel }),
+  setTaxRate: (taxRate) =>
+    set((state) => {
+      const nextRate = Number.isFinite(taxRate) ? taxRate : 0;
+      const paymentSummary = buildSummary(state.cart, state.selectedDiscount, nextRate);
+
+      return {
+        taxRate: nextRate,
+        paymentSummary,
+        paymentDraft:
+          state.paymentDraft.method === "cash"
+            ? {
+                ...state.paymentDraft,
+                amountTendered:
+                  state.paymentDraft.amountTendered < paymentSummary.grandTotal
+                    ? paymentSummary.grandTotal
+                    : state.paymentDraft.amountTendered
+              }
+            : state.paymentDraft
+      };
+    }),
   addItem: (product, addons = []) => {
     let added = false;
 
@@ -127,7 +150,7 @@ export const usePosStore = create<PosState>((set) => ({
         ? state.cart.map((item) => (item.key === key ? { ...item, quantity: nextQuantity } : item))
         : [...state.cart, { key, product, quantity: 1, addons }];
 
-      const paymentSummary = buildSummary(cart, state.selectedDiscount);
+      const paymentSummary = buildSummary(cart, state.selectedDiscount, state.taxRate);
       const paymentDraft = {
         ...state.paymentDraft,
         amountTendered:
@@ -162,7 +185,7 @@ export const usePosStore = create<PosState>((set) => ({
           ? state.cart.filter((item) => item.key !== itemKey)
           : state.cart.map((item) => (item.key === itemKey ? { ...item, quantity: nextQuantity } : item));
 
-      const paymentSummary = buildSummary(cart, state.selectedDiscount);
+      const paymentSummary = buildSummary(cart, state.selectedDiscount, state.taxRate);
 
       return {
         cart,
@@ -184,12 +207,12 @@ export const usePosStore = create<PosState>((set) => ({
       const cart = state.cart.filter((item) => item.key !== itemKey);
       return {
         cart,
-        paymentSummary: buildSummary(cart, state.selectedDiscount)
+        paymentSummary: buildSummary(cart, state.selectedDiscount, state.taxRate)
       };
     }),
   setDiscount: (discount) =>
     set((state) => {
-      const paymentSummary = buildSummary(state.cart, discount);
+      const paymentSummary = buildSummary(state.cart, discount, state.taxRate);
       return {
         selectedDiscount: discount,
         paymentSummary,
@@ -235,7 +258,7 @@ export const usePosStore = create<PosState>((set) => ({
     })),
   resetCheckout: () =>
     set((state) => {
-      const paymentSummary = buildSummary(state.cart, null);
+      const paymentSummary = buildSummary(state.cart, null, state.taxRate);
 
       return {
         selectedDiscount: null,

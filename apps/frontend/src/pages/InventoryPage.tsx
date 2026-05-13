@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Beaker, History, PackagePlus, Search, SlidersHorizontal, X } from "lucide-react";
+import { AlertTriangle, Beaker, Download, History, PackagePlus, Printer, Search, SlidersHorizontal, X } from "lucide-react";
 import type { IngredientAdjustmentType, IngredientFormValues, ProductAddonFormValues } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useCafeSettings } from "@/hooks/use-cafe-settings";
+import { downloadInventoryReportCsv, formatReportMoney } from "@/lib/reporting";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 import { canManageInventory } from "@/utils/roles";
@@ -46,10 +48,13 @@ function numberValue(value: string) {
 
 export function InventoryPage() {
   const queryClient = useQueryClient();
+  const settingsQuery = useCafeSettings();
   const user = useAuthStore((state) => state.user);
   const canEdit = canManageInventory(user?.role);
   const [activeTab, setActiveTab] = useState<InventoryTab>("ingredients");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [ingredientEditorOpen, setIngredientEditorOpen] = useState(false);
   const [addonEditorOpen, setAddonEditorOpen] = useState(false);
   const [ingredientForm, setIngredientForm] = useState<IngredientFormValues>(emptyIngredient);
@@ -118,23 +123,41 @@ export function InventoryPage() {
   const addonIngredientRows = addonIngredientsQuery.data ?? [];
   const addonLinkRows = addonLinksQuery.data ?? [];
 
+  const ingredientCategories = useMemo(() => Array.from(new Set(ingredients.map((ingredient) => ingredient.category))).sort(), [ingredients]);
+
   const filteredIngredients = useMemo(() => {
     const normalized = query.trim().toLowerCase();
+    return ingredients.filter((ingredient) => {
+      const matchesQuery = normalized
+        ? `${ingredient.name} ${ingredient.sku} ${ingredient.category} ${ingredient.supplier ?? ""}`.toLowerCase().includes(normalized)
+        : true;
+      const matchesCategory = categoryFilter === "all" ? true : ingredient.category === categoryFilter;
+      const status = !ingredient.isActive ? "inactive" : ingredient.quantityOnHand <= 0 ? "out" : ingredient.quantityOnHand <= ingredient.lowStockThreshold ? "low" : "in";
+      const matchesStatus = statusFilter === "all" ? true : status === statusFilter;
 
-    if (!normalized) {
-      return ingredients;
-    }
-
-    return ingredients.filter((ingredient) =>
-      `${ingredient.name} ${ingredient.sku} ${ingredient.category} ${ingredient.supplier ?? ""}`.toLowerCase().includes(normalized)
-    );
-  }, [ingredients, query]);
+      return matchesQuery && matchesCategory && matchesStatus;
+    });
+  }, [categoryFilter, ingredients, query, statusFilter]);
 
   const lowStockIngredients = ingredients.filter(
     (ingredient) => ingredient.isActive && ingredient.quantityOnHand <= ingredient.lowStockThreshold
   );
+  const outOfStockIngredients = ingredients.filter((ingredient) => ingredient.isActive && ingredient.quantityOnHand <= 0);
+  const healthyIngredients = ingredients.filter((ingredient) => ingredient.isActive && ingredient.quantityOnHand > ingredient.lowStockThreshold);
   const totalIngredientUnits = ingredients.reduce((sum, ingredient) => sum + ingredient.quantityOnHand, 0);
+  const totalInventoryValue = ingredients.reduce((sum, ingredient) => sum + ingredient.quantityOnHand * ingredient.costPerUnit, 0);
   const productsWithRecipes = products.filter((product) => product.hasRecipe).length;
+  const inventoryByCategory = ingredientCategories
+    .map((category) => {
+      const categoryItems = filteredIngredients.filter((ingredient) => ingredient.category === category);
+      return {
+        category,
+        totalValue: categoryItems.reduce((sum, ingredient) => sum + ingredient.quantityOnHand * ingredient.costPerUnit, 0),
+        count: categoryItems.length
+      };
+    })
+    .filter((row) => row.count > 0)
+    .sort((left, right) => right.totalValue - left.totalValue);
 
   const invalidateInventory = () => {
     void queryClient.invalidateQueries({ queryKey: ["ingredients"] });
@@ -290,7 +313,7 @@ export function InventoryPage() {
             <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Inventory</div>
             <h1 className="mt-3 font-display text-4xl text-[#241610]">Ingredient Inventory</h1>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Card className="border-[#eadbcb] bg-white px-4 py-4">
               <div className="text-sm text-[#7b685c]">Tracked ingredients</div>
               <div className="mt-2 text-2xl font-semibold text-[#241610]">{ingredients.length}</div>
@@ -307,11 +330,15 @@ export function InventoryPage() {
               <div className="text-sm text-[#7b685c]">Products with recipes</div>
               <div className="mt-2 text-2xl font-semibold text-[#241610]">{productsWithRecipes}</div>
             </Card>
+            <Card className="border-[#eadbcb] bg-white px-4 py-4">
+              <div className="text-sm text-[#7b685c]">Estimated value</div>
+              <div className="mt-2 text-2xl font-semibold text-[#241610]">{formatReportMoney(totalInventoryValue, settingsQuery.data?.currency)}</div>
+            </Card>
           </div>
         </div>
       </section>
 
-      <div className="flex gap-2 overflow-auto rounded-[24px] border border-[#eadbcb] bg-white p-2">
+      <div className="flex gap-2 overflow-auto rounded-[24px] border border-[#eadbcb] bg-white p-2 print:hidden">
         {tabs.map((tab) => (
           <button
             key={tab.value}
@@ -328,26 +355,38 @@ export function InventoryPage() {
 
       {activeTab === "ingredients" ? (
         <Card className="border-[#eadbcb] bg-white p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Ingredients</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Inventory report</div>
               <h2 className="mt-1 text-2xl font-semibold text-[#241610]">Raw stock</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#7b685c]">
+                Review ingredient health, filter categories, export the current view, and print a report-ready inventory snapshot.
+              </p>
             </div>
-            <div className="flex flex-col gap-3 md:flex-row">
-              <div className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#eadbcb] bg-[#fffdf9] px-4 md:w-80">
-                <Search className="h-4 w-4 text-[#9a8170]" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search name, SKU, supplier"
-                  className="w-full border-0 bg-transparent p-0 text-sm outline-none"
-                />
-                {query ? (
-                  <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
+            <div className="flex flex-wrap gap-3 print:hidden">
+              <button
+                type="button"
+                onClick={() =>
+                  downloadInventoryReportCsv({
+                    settings: settingsQuery.data,
+                    items: filteredIngredients,
+                    selectedCategory: categoryFilter,
+                    selectedStatus: statusFilter
+                  })
+                }
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-[#eadbcb] bg-[#f4ece2] px-4 text-sm font-semibold text-[#5b3a29] transition hover:bg-[#efe3d3]"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download report
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-primary bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_18px_32px_rgba(122,74,46,0.18)] transition hover:bg-[#6e4228]"
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Print report
+              </button>
               {canEdit ? (
                 <Button
                   type="button"
@@ -363,9 +402,102 @@ export function InventoryPage() {
             </div>
           </div>
 
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_200px] print:hidden">
+            <div className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#eadbcb] bg-[#fffdf9] px-4">
+              <Search className="h-4 w-4 text-[#9a8170]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search name, SKU, supplier"
+                className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+              />
+              {query ? (
+                <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4">
+              <option value="all">All categories</option>
+              {ingredientCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4">
+              <option value="all">All statuses</option>
+              <option value="in">In stock</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">Stock status</div>
+              <h3 className="mt-2 text-xl font-semibold text-[#241610]">Inventory health</h3>
+              <div className="mt-4 space-y-4">
+                {[
+                  { label: "In stock", count: healthyIngredients.length, tone: "bg-emerald-600" },
+                  { label: "Low stock", count: lowStockIngredients.length, tone: "bg-amber-500" },
+                  { label: "Out of stock", count: outOfStockIngredients.length, tone: "bg-rose-500" }
+                ].map((status) => (
+                  <div key={status.label} className="space-y-2">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="font-medium text-[#241610]">{status.label}</span>
+                      <span className="text-[#7b685c]">{status.count} items</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white">
+                      <div
+                        className={`h-full rounded-full ${status.tone}`}
+                        style={{ width: `${ingredients.length === 0 ? 0 : Math.max((status.count / ingredients.length) * 100, status.count > 0 ? 10 : 0)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">Category value</div>
+              <h3 className="mt-2 text-xl font-semibold text-[#241610]">Inventory by category</h3>
+              <div className="mt-4 space-y-4">
+                {inventoryByCategory.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[#d9c2ac] bg-white p-4 text-sm text-[#7b685c]">
+                    Category totals will appear once ingredients are available for the current filters.
+                  </div>
+                ) : (
+                  inventoryByCategory.map((category) => {
+                    const maxValue = Math.max(...inventoryByCategory.map((item) => item.totalValue), 0);
+                    return (
+                      <div key={category.category} className="space-y-2">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="font-medium text-[#241610]">{category.category}</span>
+                          <span className="text-[#7b685c]">
+                            {formatReportMoney(category.totalValue, settingsQuery.data?.currency)} / {category.count} items
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white">
+                          <div className="h-full rounded-full bg-[#7a4a2e]" style={{ width: `${maxValue === 0 ? 0 : Math.max((category.totalValue / maxValue) * 100, 10)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="mt-5 grid gap-3">
             {ingredientsQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading ingredients...</div> : null}
             {ingredientsQuery.isError ? <div className="text-sm text-rose-500">{ingredientsQuery.error.message}</div> : null}
+            {filteredIngredients.length === 0 && !ingredientsQuery.isLoading && !ingredientsQuery.isError ? (
+              <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
+                No ingredients match the current search and filters.
+              </div>
+            ) : null}
             {filteredIngredients.map((ingredient) => {
               const status = !ingredient.isActive ? "Inactive" : ingredient.quantityOnHand <= ingredient.lowStockThreshold ? "Low stock" : "Healthy";
 
@@ -428,6 +560,9 @@ export function InventoryPage() {
                 </div>
               );
             })}
+          </div>
+          <div className="mt-5 hidden text-center text-xs uppercase tracking-[0.18em] text-[#8f7767] print:block">
+            Inventory report generated on {new Date().toLocaleString("en-PH")}
           </div>
         </Card>
       ) : null}
@@ -516,7 +651,7 @@ export function InventoryPage() {
             </form>
           </Card>
 
-          <Card className="border-[#eadbcb] bg-white p-5">
+          <Card className="border-[#eadbcb] bg-white p-5 xl:flex xl:max-h-[720px] xl:flex-col">
             <div className="flex items-center gap-3">
               <div className="rounded-2xl bg-[#f3e7d8] p-3 text-[#7a4a2e]">
                 <History className="h-5 w-5" />
@@ -526,42 +661,49 @@ export function InventoryPage() {
                 <h2 className="mt-1 text-2xl font-semibold text-[#241610]">Recent ingredient adjustments</h2>
               </div>
             </div>
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4 xl:min-h-0 xl:flex-1">
               {movementsQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading history...</div> : null}
               {movementsQuery.isError ? <div className="text-sm text-rose-500">{movementsQuery.error.message}</div> : null}
-              {(movementsQuery.data ?? []).map((movement) => (
-                <div key={movement.id} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <div className="font-semibold text-[#241610]">{movement.ingredientName}</div>
-                      <div className="mt-1 text-sm text-[#7b685c]">
-                        {movement.userName} / {new Date(movement.createdAt).toLocaleString("en-PH")}
+              {movementsQuery.data?.length === 0 && !movementsQuery.isLoading && !movementsQuery.isError ? (
+                <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-white p-6 text-sm text-[#7b685c]">
+                  Movement history is empty. The next stock adjustment or ingredient sale deduction will appear here.
+                </div>
+              ) : null}
+              <div className="space-y-3 xl:max-h-[560px] xl:overflow-y-auto xl:pr-1">
+                {(movementsQuery.data ?? []).map((movement) => (
+                  <div key={movement.id} className="rounded-[24px] border border-[#eadbcb] bg-white p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="font-semibold text-[#241610]">{movement.ingredientName}</div>
+                        <div className="mt-1 text-sm text-[#7b685c]">
+                          {movement.userName} / {new Date(movement.createdAt).toLocaleString("en-PH")}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="rounded-full bg-[#f3e7d8] px-3 py-1 font-medium text-[#7a4a2e]">
+                          {movement.adjustmentType.replace("_", " ")}
+                        </span>
+                        <span className={`font-semibold ${movement.quantityDelta > 0 ? "text-emerald-700" : "text-[#a14f43]"}`}>
+                          {movement.quantityDelta > 0 ? "+" : ""}
+                          {movement.quantityDelta} {movement.ingredientUnit}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="rounded-full bg-[#f3e7d8] px-3 py-1 font-medium text-[#7a4a2e]">
-                        {movement.adjustmentType.replace("_", " ")}
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#7b685c]">
+                      <span>
+                        {movement.previousQuantity} to {movement.newQuantity}
                       </span>
-                      <span className={`font-semibold ${movement.quantityDelta > 0 ? "text-emerald-700" : "text-[#a14f43]"}`}>
-                        {movement.quantityDelta > 0 ? "+" : ""}
-                        {movement.quantityDelta} {movement.ingredientUnit}
-                      </span>
+                      {movement.reason ? <span>{movement.reason}</span> : null}
+                      {movement.referenceOrderId ? (
+                        <span className="inline-flex items-center gap-1 text-[#a36d40]">
+                          <AlertTriangle className="h-4 w-4" />
+                          Linked sale
+                        </span>
+                      ) : null}
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#7b685c]">
-                    <span>
-                      {movement.previousQuantity} to {movement.newQuantity}
-                    </span>
-                    {movement.reason ? <span>{movement.reason}</span> : null}
-                    {movement.referenceOrderId ? (
-                      <span className="inline-flex items-center gap-1 text-[#a36d40]">
-                        <AlertTriangle className="h-4 w-4" />
-                        Linked sale
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </Card>
         </section>

@@ -405,11 +405,7 @@ This uses:
 
 ### Demo Credentials
 
-Use any of these seeded Supabase accounts:
-
-- `admin@cafeposdemo.com` / `CafePos123!`
-- `manager@cafeposdemo.com` / `CafePos123!`
-- `cashier@cafeposdemo.com` / `CafePos123!`
+Use the seeded Supabase staff accounts created by `npm run seed:supabase-users`, or sign in with your own active store users. Keep credentials in environment-specific secrets instead of committing them to UI-facing docs.
 
 ### Start Frontend Only
 

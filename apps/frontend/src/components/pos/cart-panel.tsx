@@ -5,6 +5,7 @@ import { Minus, Plus, QrCode, ShoppingBag, TicketPercent, Wallet } from "lucide-
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useCafeSettings } from "@/hooks/use-cafe-settings";
 import { apiClient } from "@/services/api-client";
 import { usePosStore } from "@/stores/pos-store";
 
@@ -24,12 +25,20 @@ const paymentMethods = [
   { label: "Other", value: "other" as const, detail: "Manual payment capture with notes" }
 ];
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 2
-  }).format(value);
+function formatMoney(value: number, currency = "PHP") {
+  try {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2
+    }).format(value);
+  } catch {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 2
+    }).format(value);
+  }
 }
 
 function getCheckoutErrorMessage(error: Error) {
@@ -55,6 +64,10 @@ function getCheckoutErrorMessage(error: Error) {
     return message;
   }
 
+  if (/customer email/i.test(message)) {
+    return "Enter a valid customer email address or leave the field blank.";
+  }
+
   if (/ambiguous|column reference/i.test(message)) {
     return "Checkout hit a database configuration issue. Please refresh and try again.";
   }
@@ -64,14 +77,17 @@ function getCheckoutErrorMessage(error: Error) {
 
 export function CartPanel() {
   const queryClient = useQueryClient();
+  const settingsQuery = useCafeSettings();
   const [isPaymentOpen, setPaymentOpen] = useState(false);
   const [orderNotes, setOrderNotes] = useState("");
-  const [completedOrder, setCompletedOrder] = useState<{ id: string; orderNumber: string; grandTotal: number } | null>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [completedOrder, setCompletedOrder] = useState<{ id: string; orderNumber: string; queueNumber?: string; grandTotal: number } | null>(null);
   const cart = usePosStore((state) => state.cart);
   const channel = usePosStore((state) => state.channel);
   const selectedDiscount = usePosStore((state) => state.selectedDiscount);
   const paymentDraft = usePosStore((state) => state.paymentDraft);
   const paymentSummary = usePosStore((state) => state.paymentSummary);
+  const setTaxRate = usePosStore((state) => state.setTaxRate);
   const updateItemQuantity = usePosStore((state) => state.updateItemQuantity);
   const removeItem = usePosStore((state) => state.removeItem);
   const clearCart = usePosStore((state) => state.clearCart);
@@ -82,6 +98,12 @@ export function CartPanel() {
   const setReferenceNumber = usePosStore((state) => state.setReferenceNumber);
   const setPaymentNotes = usePosStore((state) => state.setPaymentNotes);
   const resetCheckout = usePosStore((state) => state.resetCheckout);
+  const currency = settingsQuery.data?.currency ?? "PHP";
+  const requiresReference = Boolean(settingsQuery.data?.requirePaymentReference ?? true) && ["gcash", "qr", "instapay"].includes(paymentDraft.method);
+
+  useEffect(() => {
+    setTaxRate(settingsQuery.data?.taxRate ?? 12);
+  }, [setTaxRate, settingsQuery.data?.taxRate]);
 
   const discountsQuery = useQuery({
     queryKey: ["discounts", "active"],
@@ -113,13 +135,14 @@ export function CartPanel() {
   const checkoutBlocked =
     cart.length === 0 ||
     (paymentDraft.method === "cash" && paymentDraft.amountTendered < paymentSummary.grandTotal) ||
-    (["gcash", "qr", "instapay"].includes(paymentDraft.method) && paymentDraft.referenceNumber.trim().length === 0);
+    (requiresReference && paymentDraft.referenceNumber.trim().length === 0);
 
   const orderMutation = useMutation({
     mutationFn: async () => {
       return apiClient.createOrder({
         order_type: channel,
         payment_method: paymentDraft.method,
+        customer_email: customerEmail.trim() || undefined,
         discount_id: selectedDiscount?.id,
         amount_paid: paymentDraft.method === "cash" ? paymentDraft.amountTendered : undefined,
         payment_reference: paymentDraft.referenceNumber.trim() || undefined,
@@ -137,12 +160,16 @@ export function CartPanel() {
     },
     onSuccess: (result) => {
       toast.success(`Order ${result.orderNumber} completed`, {
-        description: `Receipt total ${formatMoney(result.grandTotal)}`
+        description: `${result.queueNumber ? `${result.queueNumber} ready · ` : ""}Receipt total ${formatMoney(result.grandTotal, currency)}`
       });
       setCompletedOrder(result);
+      if (settingsQuery.data?.autoPrintReceipt) {
+        window.open(`/orders/${result.id}/receipt`, "_blank", "noopener,noreferrer");
+      }
       clearCart();
       resetCheckout();
       setOrderNotes("");
+      setCustomerEmail("");
       setPaymentOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -209,13 +236,13 @@ export function CartPanel() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium text-[#241610]">{item.product.name}</div>
-                    <div className="mt-1 text-sm text-[#7b685c]">{formatMoney(item.product.price)} each</div>
+                    <div className="mt-1 text-sm text-[#7b685c]">{formatMoney(item.product.price, currency)} each</div>
                     {item.addons.length > 0 ? (
                       <div className="mt-2 space-y-1 text-sm text-[#7b685c]">
                         {item.addons.map((addon) => (
                           <div key={addon.addonId}>
                             + {addon.name}
-                            {addon.quantity > 1 ? ` x${addon.quantity}` : ""} / {formatMoney(addon.priceDelta * addon.quantity)}
+                            {addon.quantity > 1 ? ` x${addon.quantity}` : ""} / {formatMoney(addon.priceDelta * addon.quantity, currency)}
                           </div>
                         ))}
                       </div>
@@ -243,7 +270,7 @@ export function CartPanel() {
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="text-sm font-semibold text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity)}</div>
+                  <div className="text-sm font-semibold text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity, currency)}</div>
                 </div>
               </div>
               );
@@ -254,25 +281,25 @@ export function CartPanel() {
         <div className="shrink-0 space-y-2 rounded-[24px] border border-[#eadbcb] bg-[linear-gradient(180deg,#fff8ef,#f4e8da)] p-4 text-[#241610]">
           <div className="flex items-center justify-between text-sm text-[#7b685c]">
             <span>Subtotal</span>
-            <span>{formatMoney(paymentSummary.subtotal)}</span>
+            <span>{formatMoney(paymentSummary.subtotal, currency)}</span>
           </div>
           {paymentSummary.discountTotal > 0 ? (
             <div className="flex items-center justify-between text-sm text-[#7b685c]">
               <span>Discount</span>
-              <span>-{formatMoney(paymentSummary.discountTotal)}</span>
+              <span>-{formatMoney(paymentSummary.discountTotal, currency)}</span>
             </div>
           ) : null}
           <div className="flex items-center justify-between text-sm text-[#7b685c]">
             <span>Taxable amount</span>
-            <span>{formatMoney(paymentSummary.taxableSubtotal)}</span>
+            <span>{formatMoney(paymentSummary.taxableSubtotal, currency)}</span>
           </div>
           <div className="flex items-center justify-between text-sm text-[#7b685c]">
             <span>Tax</span>
-            <span>{formatMoney(paymentSummary.taxTotal)}</span>
+            <span>{formatMoney(paymentSummary.taxTotal, currency)}</span>
           </div>
           <div className="flex items-center justify-between text-lg font-semibold text-[#3b2418]">
             <span>Total</span>
-            <span>{formatMoney(paymentSummary.grandTotal)}</span>
+            <span>{formatMoney(paymentSummary.grandTotal, currency)}</span>
           </div>
         </div>
 
@@ -292,7 +319,7 @@ export function CartPanel() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">{cart.length} item ticket</div>
-              <div className="mt-1 text-lg font-semibold text-[#241610]">{formatMoney(paymentSummary.grandTotal)}</div>
+              <div className="mt-1 text-lg font-semibold text-[#241610]">{formatMoney(paymentSummary.grandTotal, currency)}</div>
             </div>
             <Button size="lg" onClick={openPayment}>
               Checkout
@@ -356,7 +383,7 @@ export function CartPanel() {
                         <div className="flex items-center justify-between gap-3">
                           <div className="font-medium text-[#241610]">{discount.name}</div>
                           <span className="rounded-full bg-[#f3e7d8] px-3 py-1 text-xs font-semibold text-[#7a4a2e]">
-                            {discount.valueType === "percent" ? `${discount.valueAmount}%` : formatMoney(discount.valueAmount)}
+                            {discount.valueType === "percent" ? `${discount.valueAmount}%` : formatMoney(discount.valueAmount, currency)}
                           </span>
                         </div>
                         <div className="mt-2 text-sm text-[#7b685c]">
@@ -425,6 +452,20 @@ export function CartPanel() {
                     </label>
                   </div>
 
+                  <div className="mt-4">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-[#5f4637]">Customer email (optional)</span>
+                      <input
+                        value={customerEmail}
+                        onChange={(event) => setCustomerEmail(event.target.value)}
+                        className="h-12 w-full rounded-2xl bg-white px-4"
+                        placeholder="guest@example.com"
+                        inputMode="email"
+                      />
+                      <p className="text-xs text-[#8f7767]">This is stored on the order so email receipts can be added later without changing the checkout flow.</p>
+                    </label>
+                  </div>
+
                   {paymentDraft.method !== "cash" ? (
                     <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
                       <div className="grid place-items-center rounded-[24px] border border-dashed border-[#d9c2ac] bg-white p-6">
@@ -470,7 +511,7 @@ export function CartPanel() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="font-medium text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity)}</div>
+                      <div className="font-medium text-[#241610]">{formatMoney((item.product.price + addonTotal) * item.quantity, currency)}</div>
                     </div>
                     );
                   })}
@@ -479,31 +520,31 @@ export function CartPanel() {
                 <div className="mt-5 space-y-2 text-sm">
                   <div className="flex items-center justify-between text-[#7b685c]">
                     <span>Subtotal</span>
-                    <span>{formatMoney(paymentSummary.subtotal)}</span>
+                    <span>{formatMoney(paymentSummary.subtotal, currency)}</span>
                   </div>
                   {selectedDiscount ? (
                     <div className="flex items-center justify-between text-[#7b685c]">
                       <span>{selectedDiscount.name}</span>
-                      <span>-{formatMoney(paymentSummary.discountTotal)}</span>
+                      <span>-{formatMoney(paymentSummary.discountTotal, currency)}</span>
                     </div>
                   ) : null}
                   <div className="flex items-center justify-between text-[#7b685c]">
                     <span>Tax</span>
-                    <span>{formatMoney(paymentSummary.taxTotal)}</span>
+                    <span>{formatMoney(paymentSummary.taxTotal, currency)}</span>
                   </div>
                   <div className="flex items-center justify-between text-lg font-semibold text-[#241610]">
                     <span>Total due</span>
-                    <span>{formatMoney(paymentSummary.grandTotal)}</span>
+                    <span>{formatMoney(paymentSummary.grandTotal, currency)}</span>
                   </div>
                   {paymentDraft.method === "cash" ? (
                     <>
                       <div className="flex items-center justify-between text-[#7b685c]">
                         <span>Amount tendered</span>
-                        <span>{formatMoney(paymentDraft.amountTendered)}</span>
+                        <span>{formatMoney(paymentDraft.amountTendered, currency)}</span>
                       </div>
                       <div className="flex items-center justify-between font-semibold text-[#3b2418]">
                         <span>Change</span>
-                        <span>{formatMoney(changePreview)}</span>
+                        <span>{formatMoney(changePreview, currency)}</span>
                       </div>
                     </>
                   ) : null}
@@ -532,6 +573,11 @@ export function CartPanel() {
           >
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Receipt ready</div>
             <h4 className="mt-2 text-2xl font-semibold text-[#241610]">{completedOrder.orderNumber} is complete</h4>
+            {completedOrder.queueNumber ? (
+              <div className="mt-4 inline-flex rounded-full border border-[#d9c2ac] bg-[#fff7ef] px-4 py-2 text-base font-semibold tracking-[0.18em] text-[#7a4a2e]">
+                Queue No: {completedOrder.queueNumber}
+              </div>
+            ) : null}
             <p className="mt-3 text-sm leading-6 text-[#7b685c]">
               The order has been recorded, stock was deducted, and the receipt can be opened in a print-friendly view.
             </p>

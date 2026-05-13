@@ -227,24 +227,47 @@ export type SalesSummary = {
     quantity: number;
     revenue: number;
   }>;
+  salesByDay: Array<{
+    date: string;
+    label: string;
+    revenue: number;
+    orders: number;
+  }>;
+  paymentBreakdown: Array<{
+    method: PaymentProvider;
+    orders: number;
+    revenue: number;
+  }>;
+  categoryBreakdown: Array<{
+    category: string;
+    quantity: number;
+    revenue: number;
+  }>;
+  orders: OrderListItem[];
   recentOrders: OrderListItem[];
 };
 
 export type OrderLineItem = {
   id: string;
+  productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  category?: string;
   addons?: OrderItemAddonRecord[];
 };
 
 export type OrderListItem = {
   id: string;
   orderNumber: string;
+  queueNumber?: string;
+  queueDate?: string;
+  receiptSettings?: CafeSettings;
   orderType: OrderChannel;
   paymentMethod: PaymentProvider;
   cashierName: string;
+  customerEmail?: string;
   notes?: string;
   subtotal: number;
   discountLabel?: string;
@@ -263,6 +286,7 @@ export type OrderListItem = {
 export type OrderPayload = {
   order_type: OrderChannel;
   payment_method: PaymentProvider;
+  customer_email?: string;
   notes?: string;
   discount_id?: string;
   amount_paid?: number;
@@ -276,6 +300,37 @@ export type OrderPayload = {
       quantity: number;
     }>;
   }>;
+};
+
+export type CafeSettings = {
+  storeName: string;
+  branchName: string;
+  contactNumber: string;
+  email: string;
+  address: string;
+  businessInfo: string;
+  logoUrl?: string;
+  receiptHeader: string;
+  receiptFooter: string;
+  receiptNotes: string;
+  showLogo: boolean;
+  showCashierName: boolean;
+  showOrderNumber: boolean;
+  showQueueNumber: boolean;
+  taxLabel: string;
+  taxRate: number;
+  currency: string;
+  defaultOrderType: OrderChannel;
+  stockWarning: boolean;
+  lowStockThreshold: number;
+  requirePaymentReference: boolean;
+  autoPrintReceipt: boolean;
+  seniorDiscount: boolean;
+  pwdDiscount: boolean;
+  defaultDiscountPercent: number;
+  promoCodes: boolean;
+  manualDiscountRoles: string;
+  compactMode: boolean;
 };
 
 export type ProductFormValues = {

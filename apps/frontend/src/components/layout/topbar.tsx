@@ -120,7 +120,7 @@ export function Topbar() {
   }, [notificationsOpen]);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-[#eadbcb] bg-[rgba(255,253,249,0.9)] px-4 py-4 backdrop-blur-xl md:px-6 xl:px-8">
+    <header className="sticky top-0 z-10 border-b border-[#eadbcb] bg-[rgba(255,253,249,0.9)] px-4 py-4 backdrop-blur-xl print:hidden md:px-6 xl:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-medium text-[#8f7767]">{currentPage.eyebrow}</p>

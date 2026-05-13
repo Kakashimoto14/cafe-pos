@@ -27,7 +27,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-screen overflow-hidden border-r border-[#eadbcb] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,245,238,0.96))] p-4 backdrop-blur-xl lg:flex lg:flex-col">
+      <aside className="sticky top-0 hidden h-screen overflow-hidden border-r border-[#eadbcb] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,245,238,0.96))] p-4 backdrop-blur-xl print:hidden lg:flex lg:flex-col">
         <div className="shrink-0 rounded-[24px] border border-[#eadbcb] bg-white/95 p-4 shadow-[0_16px_34px_rgba(74,43,24,0.07)]">
           <div className="flex items-center gap-3">
             <BrandLogo variant="mark" markClassName="h-14 w-14" />
@@ -76,7 +76,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadbcb] bg-[rgba(255,253,249,0.97)] px-3 py-3 backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadbcb] bg-[rgba(255,253,249,0.97)] px-3 py-3 backdrop-blur-xl print:hidden lg:hidden">
         <div className="flex gap-2 overflow-x-auto">
           {items.map(({ to, label, icon: Icon }) => (
             <NavLink

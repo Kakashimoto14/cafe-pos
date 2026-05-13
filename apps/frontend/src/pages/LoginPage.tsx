@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, type CSSProperties, useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BarChart3, Boxes, Coffee, Printer, ReceiptText, SearchCheck, ShieldCheck } from "lucide-react";
@@ -19,28 +19,60 @@ const loginSchema = z.object({
 type LoginValues = z.infer<typeof loginSchema>;
 
 function usePrefersReducedMotion() {
-  return useMemo(() => {
+  const [reducedMotion, setReducedMotion] = useState(() => {
     if (typeof window === "undefined") {
       return false;
     }
 
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleChange = () => setReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  return reducedMotion;
 }
 
 function CoffeeIntro({ onDone }: { onDone: () => void }) {
   const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
-    const timer = window.setTimeout(onDone, reducedMotion ? 250 : 1900);
-    return () => window.clearTimeout(timer);
+    let timer = 0;
+    const frame = window.requestAnimationFrame(() => {
+      timer = window.setTimeout(onDone, reducedMotion ? 320 : 2400);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
   }, [onDone, reducedMotion]);
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#fffdf9]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(239,227,211,0.95),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(122,74,46,0.16),_transparent_30%)]" />
       <div className="relative flex w-[min(92vw,420px)] flex-col items-center rounded-[32px] border border-[#eadbcb] bg-white/92 px-8 py-10 text-center shadow-[0_30px_80px_rgba(74,43,24,0.14)]">
-        <div className={reducedMotion ? "coffee-intro-mark reduced-motion" : "coffee-intro-mark"}>
+        <div
+          className={reducedMotion ? "coffee-intro-mark reduced-motion" : "coffee-intro-mark"}
+          style={
+            reducedMotion
+              ? undefined
+              : ({
+                  ["--coffee-mark-duration" as string]: "900ms",
+                  ["--steam-duration" as string]: "1700ms",
+                  ["--coffee-progress-duration" as string]: "2200ms"
+                } as CSSProperties)
+          }
+        >
           <span className="steam steam-one" />
           <span className="steam steam-two" />
           <span className="steam steam-three" />
@@ -66,8 +98,8 @@ export function LoginPage() {
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "cashier@cafeposdemo.com",
-      password: "CafePos123!"
+      email: "",
+      password: ""
     }
   });
 
@@ -137,25 +169,16 @@ export function LoginPage() {
 
             <h2 className="mt-5 font-display text-4xl text-[#241610]">Welcome back</h2>
             <p className="mt-2 text-sm leading-6 text-[#7b685c]">Open the cafe workspace and start the next order.</p>
-
-            <div className="mt-5 rounded-2xl border border-[#eadbcb] bg-[#fffaf4] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Demo access</div>
-              <div className="mt-3 grid gap-2 text-sm text-[#4f3526]">
-                <div className="rounded-xl bg-white px-3 py-2 font-medium">cashier@cafeposdemo.com</div>
-                <div className="rounded-xl bg-white px-3 py-2 font-medium">CafePos123!</div>
-              </div>
-            </div>
-
             <form className="mt-7 space-y-4" onSubmit={form.handleSubmit((values) => loginMutation.mutate(values))}>
               <label className="space-y-2">
                 <span className="text-sm font-medium text-[#5f4637]">Email</span>
-                <input {...form.register("email")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
+                <input {...form.register("email")} className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" placeholder="you@yourcafe.com" autoComplete="username" />
                 {form.formState.errors.email ? <p className="text-sm text-rose-500">{form.formState.errors.email.message}</p> : null}
               </label>
 
               <label className="space-y-2">
                 <span className="text-sm font-medium text-[#5f4637]">Password</span>
-                <input {...form.register("password")} type="password" className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" />
+                <input {...form.register("password")} type="password" className="h-12 w-full rounded-2xl bg-[#fffdf9] px-4" placeholder="Enter your password" autoComplete="current-password" />
                 {form.formState.errors.password ? <p className="text-sm text-rose-500">{form.formState.errors.password.message}</p> : null}
               </label>
 

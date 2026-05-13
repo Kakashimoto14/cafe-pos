@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import type {
   AuthUser,
+  CafeSettings,
   CategoryFormValues,
   CategoryRecord,
   DashboardSummary,
@@ -26,6 +27,7 @@ import type {
   ProductIngredientRecord,
   SalesSummary
 } from "@cafe/shared-types";
+import { mergeCafeSettings, normalizeCafeSettingsInput } from "@/lib/cafe-settings";
 import { supabase } from "@/lib/supabase";
 
 export class SupabaseSchemaSetupError extends Error {
@@ -91,8 +93,11 @@ type DiscountRow = {
 type OrderRow = {
   id: string;
   order_number: string;
+  queue_number: string | null;
+  queue_business_date: string | null;
   order_type: OrderPayload["order_type"];
   payment_method: OrderPayload["payment_method"];
+  customer_email: string | null;
   notes: string | null;
   subtotal: number | string;
   discount_label: string | null;
@@ -104,16 +109,50 @@ type OrderRow = {
   change_due: number | string;
   payment_reference: string | null;
   payment_notes: string | null;
+  receipt_settings_snapshot: Partial<CafeSettings> | null;
   created_at: string;
   profiles?: { full_name: string | null } | Array<{ full_name: string | null }> | null;
   order_items?: Array<{
     id: string;
+    product_id: string;
     product_name: string;
     quantity: number;
     unit_price: number | string;
     line_total: number | string;
     order_item_addons?: Array<OrderItemAddonRow>;
   }>;
+};
+
+type BusinessSettingsRow = {
+  settings_key: string;
+  store_name: string;
+  branch_name: string;
+  contact_number: string;
+  email: string;
+  address: string;
+  business_info: string;
+  logo_url: string | null;
+  receipt_header: string;
+  receipt_footer: string;
+  receipt_notes: string;
+  show_logo: boolean;
+  show_cashier_name: boolean;
+  show_order_number: boolean;
+  show_queue_number: boolean;
+  tax_label: string;
+  tax_rate: number | string;
+  currency: string;
+  default_order_type: CafeSettings["defaultOrderType"];
+  stock_warning: boolean;
+  low_stock_threshold: number;
+  require_payment_reference: boolean;
+  auto_print_receipt: boolean;
+  senior_discount: boolean;
+  pwd_discount: boolean;
+  default_discount_percent: number | string;
+  promo_codes: boolean;
+  manual_discount_roles: string;
+  compact_mode: boolean;
 };
 
 type InventoryAdjustmentRow = {
@@ -324,15 +363,52 @@ function mapDiscount(row: DiscountRow): DiscountRecord {
   };
 }
 
+function mapCafeSettingsRow(row: Partial<BusinessSettingsRow>): CafeSettings {
+  return mergeCafeSettings({
+    storeName: row.store_name,
+    branchName: row.branch_name,
+    contactNumber: row.contact_number,
+    email: row.email,
+    address: row.address,
+    businessInfo: row.business_info,
+    logoUrl: row.logo_url ?? "",
+    receiptHeader: row.receipt_header,
+    receiptFooter: row.receipt_footer,
+    receiptNotes: row.receipt_notes,
+    showLogo: row.show_logo,
+    showCashierName: row.show_cashier_name,
+    showOrderNumber: row.show_order_number,
+    showQueueNumber: row.show_queue_number,
+    taxLabel: row.tax_label,
+    taxRate: toNumber(row.tax_rate ?? 0),
+    currency: row.currency,
+    defaultOrderType: row.default_order_type,
+    stockWarning: row.stock_warning,
+    lowStockThreshold: row.low_stock_threshold,
+    requirePaymentReference: row.require_payment_reference,
+    autoPrintReceipt: row.auto_print_receipt,
+    seniorDiscount: row.senior_discount,
+    pwdDiscount: row.pwd_discount,
+    defaultDiscountPercent: toNumber(row.default_discount_percent ?? 0),
+    promoCodes: row.promo_codes,
+    manualDiscountRoles: row.manual_discount_roles,
+    compactMode: row.compact_mode
+  });
+}
+
 function mapOrder(row: OrderRow): OrderListItem {
   const cashierProfile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
 
   return {
     id: row.id,
     orderNumber: row.order_number,
+    queueNumber: row.queue_number ?? undefined,
+    queueDate: row.queue_business_date ?? undefined,
+    receiptSettings: row.receipt_settings_snapshot ? mapCafeSettingsRow(row.receipt_settings_snapshot) : undefined,
     orderType: row.order_type,
     paymentMethod: row.payment_method,
     cashierName: cashierProfile?.full_name ?? "Unknown cashier",
+    customerEmail: row.customer_email ?? undefined,
     notes: row.notes ?? undefined,
     subtotal: toNumber(row.subtotal),
     discountLabel: row.discount_label ?? undefined,
@@ -348,6 +424,7 @@ function mapOrder(row: OrderRow): OrderListItem {
     items:
       row.order_items?.map((item) => ({
         id: item.id,
+        productId: item.product_id,
         productName: item.product_name,
         quantity: item.quantity,
         unitPrice: toNumber(item.unit_price),
@@ -761,10 +838,44 @@ async function toggleDiscount(id: string, isActive: boolean) {
   }
 }
 
+async function businessSettings() {
+  const { data, error } = await supabase
+    .from("business_settings")
+    .select(BUSINESS_SETTINGS_SELECT)
+    .eq("settings_key", "default")
+    .maybeSingle();
+
+  if (error) {
+    if (isSupabaseSchemaError(error)) {
+      return mergeCafeSettings();
+    }
+
+    throwSupabaseError(error);
+  }
+
+  return data ? mapCafeSettingsRow(data as BusinessSettingsRow) : mergeCafeSettings();
+}
+
+async function saveBusinessSettings(values: CafeSettings) {
+  const payload = mapCafeSettingsToRow(values);
+  const { data, error } = await supabase
+    .from("business_settings")
+    .upsert(payload)
+    .select(BUSINESS_SETTINGS_SELECT)
+    .single();
+
+  if (error || !data) {
+    throwSupabaseError(error, "Business settings table is not available yet. Apply the latest Supabase migration.");
+  }
+
+  return mapCafeSettingsRow(data as BusinessSettingsRow);
+}
+
 async function createOrder(payload: OrderPayload) {
   const { data, error } = await supabase.rpc("create_order", {
     p_order_type: payload.order_type,
     p_payment_method: payload.payment_method,
+    p_customer_email: payload.customer_email ?? null,
     p_notes: payload.notes ?? null,
     p_items: payload.items,
     p_discount_id: payload.discount_id ?? null,
@@ -782,16 +893,56 @@ async function createOrder(payload: OrderPayload) {
   return {
     id: order.id as string,
     orderNumber: order.order_number as string,
+    queueNumber: (order.queue_number as string | null) ?? undefined,
     grandTotal: toNumber(order.grand_total as number | string)
+  };
+}
+
+const BUSINESS_SETTINGS_SELECT =
+  "settings_key, store_name, branch_name, contact_number, email, address, business_info, logo_url, receipt_header, receipt_footer, receipt_notes, show_logo, show_cashier_name, show_order_number, show_queue_number, tax_label, tax_rate, currency, default_order_type, stock_warning, low_stock_threshold, require_payment_reference, auto_print_receipt, senior_discount, pwd_discount, default_discount_percent, promo_codes, manual_discount_roles, compact_mode";
+
+function mapCafeSettingsToRow(values: CafeSettings): BusinessSettingsRow {
+  const normalized = normalizeCafeSettingsInput(values);
+
+  return {
+    settings_key: "default",
+    store_name: normalized.storeName,
+    branch_name: normalized.branchName,
+    contact_number: normalized.contactNumber,
+    email: normalized.email,
+    address: normalized.address,
+    business_info: normalized.businessInfo,
+    logo_url: normalized.logoUrl?.trim() ? normalized.logoUrl.trim() : null,
+    receipt_header: normalized.receiptHeader,
+    receipt_footer: normalized.receiptFooter,
+    receipt_notes: normalized.receiptNotes,
+    show_logo: normalized.showLogo,
+    show_cashier_name: normalized.showCashierName,
+    show_order_number: normalized.showOrderNumber,
+    show_queue_number: normalized.showQueueNumber,
+    tax_label: normalized.taxLabel,
+    tax_rate: normalized.taxRate,
+    currency: normalized.currency,
+    default_order_type: normalized.defaultOrderType,
+    stock_warning: normalized.stockWarning,
+    low_stock_threshold: normalized.lowStockThreshold,
+    require_payment_reference: normalized.requirePaymentReference,
+    auto_print_receipt: normalized.autoPrintReceipt,
+    senior_discount: normalized.seniorDiscount,
+    pwd_discount: normalized.pwdDiscount,
+    default_discount_percent: normalized.defaultDiscountPercent,
+    promo_codes: normalized.promoCodes,
+    manual_discount_roles: normalized.manualDiscountRoles,
+    compact_mode: normalized.compactMode
   };
 }
 
 function buildOrderSelect(includeAddons = true) {
   if (!includeAddons) {
-    return "id, order_number, order_type, payment_method, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_name, quantity, unit_price, line_total)";
+    return "id, order_number, queue_number, queue_business_date, order_type, payment_method, customer_email, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, receipt_settings_snapshot, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_id, product_name, quantity, unit_price, line_total)";
   }
 
-  return "id, order_number, order_type, payment_method, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_name, quantity, unit_price, line_total, order_item_addons(id, order_item_id, addon_id, addon_name, price_delta, quantity, created_at))";
+  return "id, order_number, queue_number, queue_business_date, order_type, payment_method, customer_email, notes, subtotal, discount_label, discount_code, discount_total, tax_total, grand_total, amount_paid, change_due, payment_reference, payment_notes, receipt_settings_snapshot, created_at, profiles!orders_cashier_id_fkey(full_name), order_items(id, product_id, product_name, quantity, unit_price, line_total, order_item_addons(id, order_item_id, addon_id, addon_name, price_delta, quantity, created_at))";
 }
 
 async function listOrders(limit = 24) {
@@ -1457,14 +1608,61 @@ async function salesSummary(range?: { from?: string; to?: string }): Promise<Sal
     throwSupabaseError(error);
   }
 
+  const productCategoryResult = await supabase.from("products").select("id, categories(name)");
+
+  if (productCategoryResult.error && !isSupabaseSchemaError(productCategoryResult.error)) {
+    throw new Error(formatSupabaseError(productCategoryResult.error));
+  }
+
+  const productCategoryMap = new Map<string, string>();
+
+  for (const row of productCategoryResult.data ?? []) {
+    const category = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+    productCategoryMap.set(row.id as string, (category?.name as string | undefined) ?? "Uncategorized");
+  }
+
   const orders = ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
   const ordersCount = orders.length;
   const revenueTotal = orders.reduce((sum, order) => sum + order.grandTotal, 0);
   const topItemsMap = new Map<string, { productName: string; quantity: number; revenue: number }>();
+  const paymentBreakdownMap = new Map<SalesSummary["paymentBreakdown"][number]["method"], SalesSummary["paymentBreakdown"][number]>();
+  const categoryBreakdownMap = new Map<string, SalesSummary["categoryBreakdown"][number]>();
+  const salesByDayMap = new Map<string, SalesSummary["salesByDay"][number]>();
 
   for (const order of orders) {
+    const orderDate = new Date(order.createdAt);
+    const dayKey = orderDate.toISOString().slice(0, 10);
+    const daySummary = salesByDayMap.get(dayKey);
+
+    if (daySummary) {
+      daySummary.revenue += order.grandTotal;
+      daySummary.orders += 1;
+    } else {
+      salesByDayMap.set(dayKey, {
+        date: dayKey,
+        label: orderDate.toLocaleDateString("en-PH", { month: "short", day: "numeric" }),
+        revenue: order.grandTotal,
+        orders: 1
+      });
+    }
+
+    const paymentSummary = paymentBreakdownMap.get(order.paymentMethod);
+
+    if (paymentSummary) {
+      paymentSummary.orders += 1;
+      paymentSummary.revenue += order.grandTotal;
+    } else {
+      paymentBreakdownMap.set(order.paymentMethod, {
+        method: order.paymentMethod,
+        orders: 1,
+        revenue: order.grandTotal
+      });
+    }
+
     for (const item of order.items) {
       const existing = topItemsMap.get(item.productName);
+      const categoryName = productCategoryMap.get(item.productId) ?? item.category ?? "Uncategorized";
+      const categorySummary = categoryBreakdownMap.get(categoryName);
 
       if (existing) {
         existing.quantity += item.quantity;
@@ -1472,6 +1670,17 @@ async function salesSummary(range?: { from?: string; to?: string }): Promise<Sal
       } else {
         topItemsMap.set(item.productName, {
           productName: item.productName,
+          quantity: item.quantity,
+          revenue: item.lineTotal
+        });
+      }
+
+      if (categorySummary) {
+        categorySummary.quantity += item.quantity;
+        categorySummary.revenue += item.lineTotal;
+      } else {
+        categoryBreakdownMap.set(categoryName, {
+          category: categoryName,
           quantity: item.quantity,
           revenue: item.lineTotal
         });
@@ -1484,6 +1693,10 @@ async function salesSummary(range?: { from?: string; to?: string }): Promise<Sal
     ordersCount,
     averageOrderValue: ordersCount === 0 ? 0 : Number((revenueTotal / ordersCount).toFixed(2)),
     topItems: [...topItemsMap.values()].sort((left, right) => right.quantity - left.quantity).slice(0, 5),
+    salesByDay: [...salesByDayMap.values()].sort((left, right) => left.date.localeCompare(right.date)),
+    paymentBreakdown: [...paymentBreakdownMap.values()].sort((left, right) => right.revenue - left.revenue),
+    categoryBreakdown: [...categoryBreakdownMap.values()].sort((left, right) => right.revenue - left.revenue),
+    orders,
     recentOrders: orders.slice(0, 8)
   };
 }
@@ -1496,6 +1709,7 @@ export const apiClient = {
   createOrder,
   createUser,
   dashboardSummary,
+  businessSettings,
   deleteAddonIngredient,
   deleteProductAddonLink,
   deleteProductIngredient,
@@ -1517,6 +1731,7 @@ export const apiClient = {
   salesSummary,
   saveAddon,
   saveAddonIngredient,
+  saveBusinessSettings,
   saveCategory,
   saveDiscount,
   saveIngredient,

@@ -4,12 +4,20 @@ import { ReceiptText, Search, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { apiClient } from "@/services/api-client";
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    minimumFractionDigits: 2
-  }).format(value);
+function formatMoney(value: number, currency = "PHP") {
+  try {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2
+    }).format(value);
+  } catch {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 2
+    }).format(value);
+  }
 }
 
 export function OrdersPage() {
@@ -100,11 +108,16 @@ export function OrdersPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">{order.orderType.replace("_", " ")}</div>
                   <h2 className="mt-2 text-xl font-semibold text-[#241610]">{order.orderNumber}</h2>
+                  {order.queueNumber ? (
+                    <div className="mt-3 inline-flex rounded-full border border-[#d9c2ac] bg-[#fff7ef] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#7a4a2e]">
+                      Queue {order.queueNumber}
+                    </div>
+                  ) : null}
                   <p className="mt-1 text-sm text-[#7b685c]">{order.cashierName} / {new Date(order.createdAt).toLocaleString("en-PH")}</p>
                 </div>
                 <div className="rounded-2xl border border-[#eadbcb] bg-[#fffaf4] px-4 py-3 text-right text-[#241610]">
                   <div className="text-xs uppercase tracking-[0.2em] text-[#8f7767]">{order.paymentMethod}</div>
-                  <div className="mt-1 text-lg font-semibold">{formatMoney(order.grandTotal)}</div>
+                  <div className="mt-1 text-lg font-semibold">{formatMoney(order.grandTotal, order.receiptSettings?.currency)}</div>
                 </div>
               </div>
 
@@ -125,7 +138,7 @@ export function OrdersPage() {
                         </div>
                       ) : null}
                     </div>
-                    <div className="text-right text-[#6c584b]">{formatMoney(item.lineTotal)}</div>
+                    <div className="text-right text-[#6c584b]">{formatMoney(item.lineTotal, order.receiptSettings?.currency)}</div>
                   </div>
                 ))}
               </div>
@@ -133,7 +146,7 @@ export function OrdersPage() {
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#7b685c]">
                 {order.discountTotal > 0 ? (
                   <span>
-                    Discount: {order.discountLabel ?? order.discountCode ?? "Applied"} ({formatMoney(order.discountTotal)})
+                    Discount: {order.discountLabel ?? order.discountCode ?? "Applied"} ({formatMoney(order.discountTotal, order.receiptSettings?.currency)})
                   </span>
                 ) : null}
                 {order.paymentReference ? <span>Reference: {order.paymentReference}</span> : null}

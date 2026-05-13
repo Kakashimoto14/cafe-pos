@@ -5,10 +5,12 @@ import { Printer } from "lucide-react";
 import { ReceiptDocument } from "@/components/sales/ReceiptDocument";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useCafeSettings } from "@/hooks/use-cafe-settings";
 import { apiClient } from "@/services/api-client";
 
 export function ReceiptPage() {
   const { orderId } = useParams<{ orderId: string }>();
+  const settingsQuery = useCafeSettings();
 
   const receiptQuery = useQuery({
     queryKey: ["orders", orderId, "receipt"],
@@ -17,11 +19,12 @@ export function ReceiptPage() {
   });
 
   useEffect(() => {
-    document.title = "Receipt | Cozy Cafe POS";
+    const storeName = settingsQuery.data?.storeName ?? "Cafe POS";
+    document.title = `Receipt | ${storeName}`;
     return () => {
-      document.title = "Cozy Cafe POS";
+      document.title = storeName;
     };
-  }, []);
+  }, [settingsQuery.data?.storeName]);
 
   if (receiptQuery.isLoading) {
     return (
@@ -49,7 +52,7 @@ export function ReceiptPage() {
           Print receipt
         </Button>
       </div>
-      <ReceiptDocument order={receiptQuery.data} />
+      <ReceiptDocument order={receiptQuery.data} settings={settingsQuery.data} />
     </div>
   );
 }
