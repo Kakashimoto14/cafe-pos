@@ -4,6 +4,14 @@ import cozyCafeLogo from "@/assets/brand/cozy-cafe-pos-logo.png";
 const PHONE_PATTERN = /^[+()\d\s-]{7,20}$/;
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 
+export function safeTrim(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function removeUndefinedFields<T extends Record<string, unknown>>(values: T) {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as Partial<T>;
+}
+
 export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
   storeName: "Cozy Cafe",
   branchName: "Main Counter",
@@ -38,26 +46,36 @@ export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
 export function mergeCafeSettings(settings?: Partial<CafeSettings> | null): CafeSettings {
   return {
     ...DEFAULT_CAFE_SETTINGS,
-    ...(settings ?? {})
+    ...removeUndefinedFields(settings ?? {})
   };
+}
+
+export function mergeReceiptSnapshotWithSettings(
+  snapshot?: Partial<CafeSettings> | null,
+  currentSettings?: Partial<CafeSettings> | null
+) {
+  return mergeCafeSettings({
+    ...removeUndefinedFields(snapshot ?? {}),
+    ...removeUndefinedFields(currentSettings ?? {})
+  });
 }
 
 export function normalizeCafeSettingsInput(settings: CafeSettings): CafeSettings {
   return mergeCafeSettings({
     ...settings,
-    storeName: settings.storeName.trim(),
-    branchName: settings.branchName.trim(),
-    contactNumber: settings.contactNumber.trim(),
-    email: settings.email.trim(),
-    address: settings.address.trim(),
-    businessInfo: settings.businessInfo.trim(),
-    logoUrl: settings.logoUrl?.trim() ?? "",
-    receiptHeader: settings.receiptHeader.trim(),
-    receiptFooter: settings.receiptFooter.trim(),
-    receiptNotes: settings.receiptNotes.trim(),
-    taxLabel: settings.taxLabel.trim(),
-    currency: settings.currency.trim().toUpperCase(),
-    manualDiscountRoles: settings.manualDiscountRoles.trim()
+    storeName: safeTrim(settings.storeName),
+    branchName: safeTrim(settings.branchName),
+    contactNumber: safeTrim(settings.contactNumber),
+    email: safeTrim(settings.email),
+    address: safeTrim(settings.address),
+    businessInfo: safeTrim(settings.businessInfo),
+    logoUrl: safeTrim(settings.logoUrl),
+    receiptHeader: safeTrim(settings.receiptHeader),
+    receiptFooter: safeTrim(settings.receiptFooter),
+    receiptNotes: safeTrim(settings.receiptNotes),
+    taxLabel: safeTrim(settings.taxLabel),
+    currency: safeTrim(settings.currency).toUpperCase(),
+    manualDiscountRoles: safeTrim(settings.manualDiscountRoles)
   });
 }
 
@@ -66,7 +84,7 @@ export function isSafeLogoUrl(value?: string | null) {
     return true;
   }
 
-  const trimmed = value.trim();
+  const trimmed = safeTrim(value);
 
   if (!trimmed) {
     return true;
@@ -89,15 +107,15 @@ export function isSafeLogoUrl(value?: string | null) {
 }
 
 export function validateCafeSettings(settings: CafeSettings) {
-  if (!settings.storeName.trim()) {
+  if (!safeTrim(settings.storeName)) {
     return "Store name is required.";
   }
 
-  if (settings.email.trim() && !EMAIL_PATTERN.test(settings.email.trim())) {
+  if (safeTrim(settings.email) && !EMAIL_PATTERN.test(safeTrim(settings.email))) {
     return "Enter a valid store email address.";
   }
 
-  if (settings.contactNumber.trim() && !PHONE_PATTERN.test(settings.contactNumber.trim())) {
+  if (safeTrim(settings.contactNumber) && !PHONE_PATTERN.test(safeTrim(settings.contactNumber))) {
     return "Enter a valid contact number.";
   }
 
@@ -122,7 +140,7 @@ export function validateCafeSettings(settings: CafeSettings) {
 
 export function getBrandLogoUrl(settings?: Partial<CafeSettings> | null) {
   const merged = mergeCafeSettings(settings);
-  return merged.logoUrl?.trim() ? merged.logoUrl.trim() : cozyCafeLogo;
+  return safeTrim(merged.logoUrl) ? safeTrim(merged.logoUrl) : cozyCafeLogo;
 }
 
 export function getBusinessContactLines(settings?: Partial<CafeSettings> | null) {
@@ -133,7 +151,7 @@ export function getBusinessContactLines(settings?: Partial<CafeSettings> | null)
 
 export function getReceiptTitle(settings?: Partial<CafeSettings> | null) {
   const merged = mergeCafeSettings(settings);
-  return merged.receiptHeader.trim() || merged.storeName.trim();
+  return safeTrim(merged.receiptHeader) || safeTrim(merged.storeName);
 }
 
 export function formatOrderChannelLabel(channel: OrderChannel) {

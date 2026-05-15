@@ -160,7 +160,7 @@ export function CartPanel() {
     },
     onSuccess: (result) => {
       toast.success(`Order ${result.orderNumber} completed`, {
-        description: `${result.queueNumber ? `${result.queueNumber} ready · ` : ""}Receipt total ${formatMoney(result.grandTotal, currency)}`
+        description: `${result.queueNumber ? `${result.queueNumber} ready - ` : ""}Receipt total ${formatMoney(result.grandTotal, currency)}`
       });
       setCompletedOrder(result);
       if (settingsQuery.data?.autoPrintReceipt) {
@@ -462,7 +462,7 @@ export function CartPanel() {
                         placeholder="guest@example.com"
                         inputMode="email"
                       />
-                      <p className="text-xs text-[#8f7767]">This is stored on the order so email receipts can be added later without changing the checkout flow.</p>
+                      <p className="text-xs text-[#8f7767]">This is stored on the order so the receipt page can email the guest without retyping it later.</p>
                     </label>
                   </div>
 

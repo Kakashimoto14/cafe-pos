@@ -191,6 +191,7 @@ The current UI includes:
 - discount selection for senior, PWD, promo, and manager-only courtesy discounts
 - mock payment flows for cash, GCash, QR, InstaPay, Maya, card, and other/manual
 - post-checkout receipt flow with browser printing
+- staff-triggered receipt email delivery through a protected Supabase Edge Function
 - inventory page with manual stock adjustments and history
 - sales page with totals, top items, and recent transactions
 - low-latency Zustand store
@@ -420,6 +421,37 @@ npm run dev:frontend
 
 See `apps/frontend/.env.example`.
 
+### Server-Side SMTP Secrets
+
+Receipt email sending is server-side only. Keep SMTP secrets out of `apps/frontend/.env` and out of any browser-exposed configuration.
+
+Set these values for Supabase Edge Functions using the project dashboard or `supabase secrets set --env-file .env.example`:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_FROM_NAME`
+- `SMTP_FROM_EMAIL`
+- `SMTP_REPLY_TO`
+
+Use `.env.example` at the repository root as the placeholder template.
+
+Gmail notes:
+
+- use `smtp.gmail.com`
+- use port `465` with `SMTP_SECURE=true`, or port `587` with `SMTP_SECURE=false` if your SMTP provider expects STARTTLS
+- Gmail requires 2-Step Verification
+- Gmail requires an App Password
+- do not use your normal Gmail password
+
+Deliverability notes:
+
+- mail can land in spam if your sending domain is not authenticated
+- configure SPF, DKIM, and DMARC when sending from a custom domain
+- avoid high-volume receipt sending from a personal Gmail mailbox
+
 ### Seed Demo Users
 
 ```powershell
@@ -442,6 +474,21 @@ npm run test:frontend
 
 - SQL migrations live in `supabase/migrations`
 - the latest feature phase adds discounts, inventory adjustments, receipt fields, and payment metadata
+
+### Supabase Edge Functions
+
+- `create-user` creates staff accounts from the Team page
+- `send-receipt-email` sends a server-rendered receipt over SMTP for active staff users
+- function notes and required secrets live in `supabase/functions/README.md`
+
+Deploying `send-receipt-email`:
+
+1. Create a private env file from the placeholder keys in the repo-root `.env.example`.
+2. Push the SMTP values to Supabase:
+   `supabase secrets set --env-file <your-private-env-file>`
+3. Deploy the function:
+   `supabase functions deploy send-receipt-email`
+4. Keep JWT verification enabled so only authenticated staff sessions can invoke it.
 
 ### Vercel Frontend Variables
 
@@ -469,6 +516,17 @@ The following validations have already succeeded in this repository:
 - frontend Vitest run with `--passWithNoTests`
 - Supabase migrations for the operations phase
 - Supabase security cleanup migration
+
+## Receipt Email Testing
+
+1. Add the SMTP secrets from `.env.example` to your Supabase Edge Function secrets.
+2. Restart local function serving or redeploy the function after changing secrets.
+3. Save receipt settings from the Settings page.
+4. Create a new order with or without a customer email.
+5. Open `/orders/:id/receipt`.
+6. Click `Email receipt`.
+7. Confirm or enter the recipient email.
+8. Send the receipt and verify the message content, totals, queue number, and branding in the inbox.
 
 ## Infrastructure Story
 

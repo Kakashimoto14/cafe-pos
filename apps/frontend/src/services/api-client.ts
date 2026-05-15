@@ -865,7 +865,7 @@ async function saveBusinessSettings(values: CafeSettings) {
     .single();
 
   if (error || !data) {
-    throwSupabaseError(error, "Business settings table is not available yet. Apply the latest Supabase migration.");
+    throwSupabaseError(error, "Business settings could not be saved right now.");
   }
 
   return mapCafeSettingsRow(data as BusinessSettingsRow);
@@ -1537,6 +1537,44 @@ async function createUser(payload: { fullName: string; email: string; role: Auth
   return data.user as AuthUser;
 }
 
+async function getFunctionErrorMessage(error: unknown, fallbackMessage: string) {
+  const response = (error as { context?: Response } | undefined)?.context;
+
+  if (response instanceof Response) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (body?.error) {
+      return body.error;
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallbackMessage;
+}
+
+async function sendReceiptEmail(payload: { orderId: string; recipientEmail?: string }) {
+  const {
+    data: { session }
+  } = await supabase.auth.getSession();
+
+  const { data, error } = await supabase.functions.invoke("send-receipt-email", {
+    body: payload,
+    headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined
+  });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, "Unable to send receipt email."));
+  }
+
+  if (!data?.success) {
+    throw new Error((data?.error as string | undefined) ?? "Unable to send receipt email.");
+  }
+
+  return data as { success: boolean; recipientEmail: string; message: string };
+}
+
 async function dashboardSummary(): Promise<DashboardSummary> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -1738,6 +1776,7 @@ export const apiClient = {
   saveProduct,
   saveProductAddonLink,
   saveProductIngredient,
+  sendReceiptEmail,
   toggleAddon,
   toggleCategory,
   toggleDiscount,

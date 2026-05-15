@@ -3,11 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BadgeCheck, Building2, CreditCard, ImageUp, Palette, Percent, ReceiptText, Save, ShieldCheck } from "lucide-react";
 import type { CafeSettings } from "@cafe/shared-types";
 import { toast } from "sonner";
-import { BrandLogo } from "@/components/branding/BrandLogo";
+import { ReceiptDocument } from "@/components/sales/ReceiptDocument";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCafeSettings } from "@/hooks/use-cafe-settings";
-import { DEFAULT_CAFE_SETTINGS, formatOrderChannelLabel, getBrandLogoUrl, normalizeCafeSettingsInput, validateCafeSettings } from "@/lib/cafe-settings";
+import { DEFAULT_CAFE_SETTINGS, formatOrderChannelLabel, normalizeCafeSettingsInput, validateCafeSettings } from "@/lib/cafe-settings";
+import { createSampleReceiptData } from "@/lib/receipt";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -101,6 +102,7 @@ export function SettingsPage() {
   });
 
   const validationError = useMemo(() => validateCafeSettings(settings), [settings]);
+  const previewOrder = useMemo(() => createSampleReceiptData(settings, user?.name ?? "Cafe Cashier"), [settings, user?.name]);
 
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -172,7 +174,7 @@ export function SettingsPage() {
 
       {settingsQuery.isError ? (
         <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-          {settingsQuery.error.message} The form is still available with safe fallback values, but the new Supabase migration needs to be applied before saves can persist.
+          {settingsQuery.error.message} The form is still available with safe fallback values, but the latest business settings could not be loaded from Supabase.
         </Card>
       ) : null}
 
@@ -328,40 +330,8 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-[24px] border border-[#eadbcb] bg-[#fffdf9] p-5 font-mono text-sm text-[#3b2418]">
-              <div className="text-center">
-                {settings.showLogo ? <BrandLogo src={getBrandLogoUrl(settings)} alt={`${settings.storeName} logo`} className="mx-auto h-16 object-contain" /> : null}
-                <div className="mt-3 font-bold">{settings.receiptHeader}</div>
-                <div>{settings.storeName}</div>
-                <div>{settings.branchName}</div>
-                <div className="text-[#7b685c]">{settings.address}</div>
-                <div className="text-[#7b685c]">{settings.contactNumber}</div>
-                <div className="text-[#7b685c]">{settings.email}</div>
-              </div>
-              <div className="my-4 border-t border-dashed border-[#d9c2ac]" />
-              {settings.showOrderNumber ? <div>Order: ORD-20260514-AB12</div> : null}
-              {settings.showQueueNumber ? <div>Queue: Q014</div> : null}
-              {settings.showCashierName ? <div>Cashier: {user?.name ?? "Cafe Cashier"}</div> : null}
-              <div className="my-4 border-t border-dashed border-[#d9c2ac]" />
-              <div className="flex justify-between">
-                <span>Americano x1</span>
-                <span>{settings.currency} 135.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span>
-                  {settings.taxLabel} {settings.taxRate}%
-                </span>
-                <span>{settings.currency} 16.20</span>
-              </div>
-              <div className="mt-3 flex justify-between text-base font-bold">
-                <span>Total</span>
-                <span>{settings.currency} 151.20</span>
-              </div>
-              <div className="my-4 border-t border-dashed border-[#d9c2ac]" />
-              <div className="space-y-2 text-center text-xs text-[#7b685c]">
-                <div>{settings.receiptNotes}</div>
-                <div>{settings.receiptFooter}</div>
-              </div>
+            <div className="mt-5">
+              <ReceiptDocument order={previewOrder} settings={settings} className="max-w-none bg-[#fffdf9] shadow-none" />
             </div>
 
             <div className="mt-4 rounded-2xl border border-[#eadbcb] bg-[#fffaf4] p-4 text-sm text-[#7b685c]">
