@@ -7,7 +7,9 @@ type AppRole = "admin" | "manager" | "cashier";
 
 type SendReceiptEmailPayload = {
   orderId?: string;
+  order_id?: string;
   recipientEmail?: string;
+  email?: string;
 };
 
 class HttpError extends Error {
@@ -34,8 +36,8 @@ function validateEmail(value: string) {
 }
 
 function validatePayload(payload: SendReceiptEmailPayload) {
-  const orderId = payload.orderId?.trim() ?? "";
-  const recipientEmail = payload.recipientEmail?.trim().toLowerCase() ?? "";
+  const orderId = (payload.orderId ?? payload.order_id)?.trim() ?? "";
+  const recipientEmail = (payload.recipientEmail ?? payload.email)?.trim().toLowerCase() ?? "";
 
   if (!orderId) {
     throw new HttpError("Order ID is required.", 400);
@@ -49,6 +51,24 @@ function validatePayload(payload: SendReceiptEmailPayload) {
     orderId,
     recipientEmail: recipientEmail || undefined
   };
+}
+
+async function readPayload(req: Request) {
+  try {
+    const body = await req.json();
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new HttpError("Request body must be a JSON object.", 400);
+    }
+
+    return body as SendReceiptEmailPayload;
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw error;
+    }
+
+    throw new HttpError("Request body must be valid JSON.", 400);
+  }
 }
 
 function resolveRecipientEmail(explicitRecipient: string | undefined, fallbackRecipient: string | null | undefined) {
@@ -67,7 +87,7 @@ function resolveRecipientEmail(explicitRecipient: string | undefined, fallbackRe
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return jsonResponse({ ok: true });
   }
 
   if (req.method !== "POST") {
@@ -125,7 +145,7 @@ Deno.serve(async (req: Request) => {
       throw new HttpError("Only active staff can send receipts.", 403);
     }
 
-    const payload = validatePayload((await req.json()) as SendReceiptEmailPayload);
+    const payload = validatePayload(await readPayload(req));
 
     const { data: orderData, error: orderError } = await adminClient
       .from("orders")
@@ -179,8 +199,12 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: error.message }, error.status);
     }
 
-    const message = error instanceof Error ? error.message : "Receipt email could not be sent.";
+    const message =
+      error instanceof Error && ["SMTP is not configured.", "SMTP authentication failed.", "SMTP server is unreachable.", "SMTP delivery failed."].includes(error.message)
+        ? error.message
+        : "Receipt email could not be sent.";
+
     console.error("Receipt email failed", message);
-    return jsonResponse({ error: message || "Receipt email could not be sent." }, 500);
+    return jsonResponse({ error: message }, 500);
   }
 });

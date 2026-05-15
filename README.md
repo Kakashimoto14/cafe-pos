@@ -425,7 +425,8 @@ See `apps/frontend/.env.example`.
 
 Receipt email sending is server-side only. Keep SMTP secrets out of `apps/frontend/.env` and out of any browser-exposed configuration.
 
-Set these values for Supabase Edge Functions using the project dashboard or `supabase secrets set --env-file .env.example`:
+1. Create a private file at `supabase/functions/.env.local`.
+2. Add these placeholders:
 
 - `SMTP_HOST`
 - `SMTP_PORT`
@@ -436,7 +437,21 @@ Set these values for Supabase Edge Functions using the project dashboard or `sup
 - `SMTP_FROM_EMAIL`
 - `SMTP_REPLY_TO`
 
-Use `.env.example` at the repository root as the placeholder template.
+   Example values:
+   `SMTP_HOST=smtp.gmail.com`
+   `SMTP_PORT=465`
+   `SMTP_SECURE=true`
+   `SMTP_USER=your-email@gmail.com`
+   `SMTP_PASS=your-google-app-password`
+   `SMTP_FROM_NAME=Cozy Cafe POS`
+   `SMTP_FROM_EMAIL=your-email@gmail.com`
+   `SMTP_REPLY_TO=your-email@gmail.com`
+
+3. Push the secrets to Supabase:
+   `npx supabase secrets set --env-file supabase/functions/.env.local`
+4. Deploy the function:
+   `npx supabase functions deploy send-receipt-email`
+5. Test the Email receipt flow from the app.
 
 Gmail notes:
 
@@ -445,6 +460,11 @@ Gmail notes:
 - Gmail requires 2-Step Verification
 - Gmail requires an App Password
 - do not use your normal Gmail password
+
+CORS troubleshooting:
+
+- if the browser says the CORS preflight failed, redeploy the function
+- confirm the `OPTIONS` response includes `access-control-allow-origin`, `access-control-allow-headers`, and `access-control-allow-methods`
 
 Deliverability notes:
 
@@ -483,11 +503,11 @@ npm run test:frontend
 
 Deploying `send-receipt-email`:
 
-1. Create a private env file from the placeholder keys in the repo-root `.env.example`.
+1. Create a private `supabase/functions/.env.local` file from the placeholder keys in the repo-root `.env.example`.
 2. Push the SMTP values to Supabase:
-   `supabase secrets set --env-file <your-private-env-file>`
+   `npx supabase secrets set --env-file supabase/functions/.env.local`
 3. Deploy the function:
-   `supabase functions deploy send-receipt-email`
+   `npx supabase functions deploy send-receipt-email`
 4. Keep JWT verification enabled so only authenticated staff sessions can invoke it.
 
 ### Vercel Frontend Variables
