@@ -1,77 +1,95 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Download, LineChart, Printer, ReceiptText, Search, TrendingUp, Wallet, X } from "lucide-react";
 import { BrandLogo } from "@/components/branding/BrandLogo";
 import { Card } from "@/components/ui/card";
+import { PaginationControls, PageErrorState, StatCardsSkeleton, TableSkeleton } from "@/components/ui/page-states";
 import { useCafeSettings } from "@/hooks/use-cafe-settings";
+import { appQueryOptions, DEFAULT_SALES_PAGE_SIZE, getDefaultSalesDateRange, toInclusiveDateTime } from "@/lib/app-queries";
 import { getBrandLogoUrl } from "@/lib/cafe-settings";
 import { downloadSalesReportCsv, formatReportMoney } from "@/lib/reporting";
-import { apiClient } from "@/services/api-client";
-
-function todayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export function SalesPage() {
-  const [from, setFrom] = useState(todayDate());
-  const [to, setTo] = useState(todayDate());
+  const defaultDateRange = useMemo(() => getDefaultSalesDateRange(), []);
+  const [from, setFrom] = useState(defaultDateRange.from);
+  const [to, setTo] = useState(defaultDateRange.to);
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const settingsQuery = useCafeSettings();
+  const limit = DEFAULT_SALES_PAGE_SIZE;
 
-  const salesQuery = useQuery({
-    queryKey: ["sales", from, to],
-    queryFn: () => apiClient.salesSummary({ from, to: `${to}T23:59:59` })
-  });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, from, to]);
+
+  const rangeEnd = toInclusiveDateTime(to);
+  const salesQuery = useQuery(appQueryOptions.salesSummary({ from, to: rangeEnd }));
+  const salesOrdersQuery = useQuery(
+    appQueryOptions.salesOrders({
+      page,
+      limit,
+      search: debouncedQuery || undefined,
+      from,
+      to: rangeEnd
+    })
+  );
 
   const currency = settingsQuery.data?.currency ?? "PHP";
   const summary = salesQuery.data;
   const generatedAt = useMemo(() => new Date(), [from, to, summary?.ordersCount, summary?.revenueTotal]);
 
-  const filteredOrders = useMemo(() => {
-    const orders = summary?.orders ?? [];
-    const normalized = deferredQuery.trim().toLowerCase();
-
-    if (!normalized) {
-      return orders;
-    }
-
-    return orders.filter((order) =>
-      [
-        order.orderNumber,
-        order.queueNumber ?? "",
-        order.cashierName,
-        order.paymentMethod,
-        order.paymentReference ?? "",
-        order.customerEmail ?? "",
-        order.notes ?? "",
-        ...order.items.map((item) => item.productName)
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized)
-    );
-  }, [deferredQuery, summary?.orders]);
-
   if (salesQuery.isLoading) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading sales report...</Card>;
+    return (
+      <div className="space-y-6">
+        <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
+          <div className="h-4 w-24 rounded-[18px] bg-[#eadccc]" />
+          <div className="mt-4 h-10 w-56 rounded-[18px] bg-[#f0e4d6]" />
+        </section>
+        <StatCardsSkeleton />
+        <TableSkeleton rows={6} columns={6} />
+      </div>
+    );
   }
 
   if (salesQuery.isError) {
-    return <Card className="p-6 text-sm text-rose-500">{salesQuery.error.message}</Card>;
+    return <PageErrorState title="Sales unavailable" message={salesQuery.error.message} onRetry={() => void salesQuery.refetch()} />;
   }
 
   if (!summary) {
-    return null;
+    return (
+      <PageErrorState
+        title="Sales summary unavailable"
+        message="The sales summary did not return any data for this request."
+        onRetry={() => void salesQuery.refetch()}
+      />
+    );
   }
 
+  const salesByDay = summary.salesByDay;
+  const topItems = summary.topItems;
+  const paymentBreakdown = summary.paymentBreakdown;
+  const categoryBreakdown = summary.categoryBreakdown;
+  const ordersCount = summary.ordersCount;
+  const hasActiveSearch = debouncedQuery.length > 0;
+  const transactionRows = salesOrdersQuery.data?.data ?? [];
   const bestSeller = summary.topItems[0];
-  const maxSalesDayRevenue = Math.max(...summary.salesByDay.map((point) => point.revenue), 0);
-  const maxTopItemRevenue = Math.max(...summary.topItems.map((item) => item.revenue), 0);
-  const maxCategoryRevenue = Math.max(...summary.categoryBreakdown.map((item) => item.revenue), 0);
+  const maxSalesDayRevenue = Math.max(...salesByDay.map((point) => point.revenue), 0);
+  const maxTopItemRevenue = Math.max(...topItems.map((item) => item.revenue), 0);
+  const maxCategoryRevenue = Math.max(...categoryBreakdown.map((item) => item.revenue), 0);
+  const salesListMessage = salesOrdersQuery.isError
+    ? salesOrdersQuery.error.message
+    : hasActiveSearch
+      ? "No matching sales transaction found."
+      : "No completed sales yet.";
   const cards = [
     { label: "Total sales", value: formatReportMoney(summary.revenueTotal, currency), icon: Wallet },
-    { label: "Total orders", value: `${summary.ordersCount}`, icon: ReceiptText },
+    { label: "Total orders", value: `${ordersCount}`, icon: ReceiptText },
     { label: "Average order", value: formatReportMoney(summary.averageOrderValue, currency), icon: TrendingUp },
     { label: "Best seller", value: bestSeller?.productName ?? "No sales yet", icon: BarChart3 }
   ];
@@ -145,12 +163,12 @@ export function SalesPage() {
             </div>
           </div>
           <div className="mt-5 space-y-4">
-            {summary.salesByDay.length === 0 ? (
+            {salesByDay.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
                 No completed sales match the selected date range yet.
               </div>
             ) : (
-              summary.salesByDay.map((point) => (
+              salesByDay.map((point) => (
                 <div key={point.date} className="space-y-2">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="font-medium text-[#241610]">{point.label}</span>
@@ -178,12 +196,12 @@ export function SalesPage() {
             </div>
           </div>
           <div className="mt-5 space-y-4">
-            {summary.topItems.length === 0 ? (
+            {topItems.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
                 Top products will appear after the first completed sale in this date range.
               </div>
             ) : (
-              summary.topItems.map((item, index) => (
+              topItems.map((item, index) => (
                 <div key={item.productName} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -217,12 +235,12 @@ export function SalesPage() {
             </div>
           </div>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {summary.paymentBreakdown.length === 0 ? (
+            {paymentBreakdown.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
                 Payment method analytics will appear after orders are completed.
               </div>
             ) : (
-              summary.paymentBreakdown.map((item) => (
+              paymentBreakdown.map((item) => (
                 <div key={item.method} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
                   <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8f7767]">{item.method}</div>
                   <div className="mt-3 text-xl font-semibold text-[#241610]">{formatReportMoney(item.revenue, currency)}</div>
@@ -244,12 +262,12 @@ export function SalesPage() {
             </div>
           </div>
           <div className="mt-5 space-y-4">
-            {summary.categoryBreakdown.length === 0 ? (
+            {categoryBreakdown.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
                 Category analytics will appear once products with categories are sold.
               </div>
             ) : (
-              summary.categoryBreakdown.map((item) => (
+              categoryBreakdown.map((item) => (
                 <div key={item.category} className="space-y-2">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="font-medium text-[#241610]">{item.category}</span>
@@ -278,7 +296,7 @@ export function SalesPage() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search order, queue, cashier, payment, email, or item"
+              placeholder="Search order, queue, payment, email, reference, or note"
               className="w-full border-0 bg-transparent p-0 text-sm outline-none"
             />
             {query ? (
@@ -289,13 +307,25 @@ export function SalesPage() {
           </div>
         </div>
 
-        {summary.orders.length === 0 ? (
+        {salesOrdersQuery.isFetching && (salesOrdersQuery.data?.data.length ?? 0) > 0 ? (
+          <div className="mt-4 text-sm text-[#8f7767] print:hidden">Refreshing transactions in the background...</div>
+        ) : null}
+
+        {ordersCount === 0 ? (
           <div className="mt-5 rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
             Orders completed from the POS will populate this report automatically.
           </div>
-        ) : filteredOrders.length === 0 ? (
+        ) : salesOrdersQuery.isLoading && !salesOrdersQuery.data ? (
+          <div className="mt-5">
+            <TableSkeleton rows={6} columns={6} />
+          </div>
+        ) : salesOrdersQuery.isError ? (
+          <div className="mt-5">
+            <PageErrorState title="Transaction list unavailable" message={salesOrdersQuery.error.message} onRetry={() => void salesOrdersQuery.refetch()} />
+          </div>
+        ) : transactionRows.length === 0 ? (
           <div className="mt-5 rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
-            No transactions match that search.
+            {salesListMessage}
           </div>
         ) : (
           <div className="mt-5 overflow-x-auto rounded-[24px] border border-[#f0e4d6] print:overflow-visible">
@@ -311,7 +341,7 @@ export function SalesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => (
+                {transactionRows.map((order) => (
                   <tr key={order.id} className="border-t border-[#f0e4d6] align-top">
                     <td className="px-4 py-4">
                       <div className="font-semibold text-[#241610]">{order.orderNumber}</div>
@@ -335,21 +365,34 @@ export function SalesPage() {
                       <div className="mt-1 text-xs text-[#8f7767]">{order.paymentReference ?? "No reference"}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="space-y-1 text-[#6c584b]">
-                        {order.items.map((item) => (
-                          <div key={item.id}>
-                            {item.productName} x{item.quantity}
-                          </div>
-                        ))}
-                      </div>
+                      {order.items.length === 0 ? (
+                        <div className="text-[#8f7767]">No items recorded</div>
+                      ) : (
+                        <div className="space-y-1 text-[#6c584b]">
+                          {order.items.map((item) => (
+                            <div key={item.id}>
+                              {item.productName} x{item.quantity}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-4 font-semibold text-[#241610]">{formatReportMoney(order.grandTotal, order.receiptSettings?.currency ?? currency)}</td>
+                    <td className="px-4 py-4 font-semibold text-[#241610]">{formatReportMoney(order.grandTotal, currency)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <div className="mt-5 print:hidden">
+          <PaginationControls
+            page={salesOrdersQuery.data?.meta.page ?? page}
+            totalPages={salesOrdersQuery.data?.meta.totalPages ?? 0}
+            label={salesOrdersQuery.data ? `Page ${salesOrdersQuery.data.meta.page}${salesOrdersQuery.data.meta.totalPages > salesOrdersQuery.data.meta.page ? " / more available" : ""}` : undefined}
+            onPageChange={setPage}
+          />
+        </div>
       </Card>
 
       <div className="hidden text-center text-xs uppercase tracking-[0.18em] text-[#8f7767] print:block">

@@ -6,6 +6,18 @@ export type PaymentProvider = "cash" | "card" | "gcash" | "maya" | "qr" | "insta
 export type InventoryAdjustmentType = "stock_in" | "stock_out" | "manual" | "sale" | "waste";
 export type IngredientAdjustmentType = InventoryAdjustmentType;
 
+export type PaginationMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type PaginatedResponse<T> = {
+  data: T[];
+  meta: PaginationMeta;
+};
+
 export type MenuProduct = {
   id: string;
   sku: string;
@@ -246,6 +258,14 @@ export type SalesSummary = {
   orders: OrderListItem[];
   recentOrders: OrderListItem[];
 };
+
+export type SalesOverview = {
+  revenueTotal: number;
+  ordersCount: number;
+  averageOrderValue: number;
+};
+
+export type SalesInsights = Omit<SalesSummary, "revenueTotal" | "ordersCount" | "averageOrderValue">;
 
 export type OrderLineItem = {
   id: string;

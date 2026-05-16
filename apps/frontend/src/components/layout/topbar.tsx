@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, BadgePercent, Bell, CheckCircle2, LogOut, ReceiptText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { appQueryOptions } from "@/lib/app-queries";
 import { apiClient } from "@/services/api-client";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
@@ -28,17 +29,13 @@ export function Topbar() {
   };
 
   const currentPage = pageMeta[location.pathname] ?? pageMeta["/"];
-  const productsQuery = useQuery({
-    queryKey: ["products", "notifications"],
-    queryFn: () => apiClient.products({ activeOnly: true })
-  });
-  const ordersQuery = useQuery({
-    queryKey: ["orders", "notifications"],
-    queryFn: () => apiClient.listOrders(1)
+  const dashboardQuery = useQuery({
+    ...appQueryOptions.dashboard(),
+    enabled: notificationsOpen
   });
   const discountsQuery = useQuery({
-    queryKey: ["discounts", "notifications"],
-    queryFn: () => apiClient.discounts({ activeOnly: true })
+    ...appQueryOptions.discounts({ page: 1, limit: 12, activeOnly: true }),
+    enabled: notificationsOpen
   });
 
   const notifications = useMemo(() => {
@@ -46,7 +43,7 @@ export function Topbar() {
       return [];
     }
 
-    const lowStock = (productsQuery.data ?? [])
+    const lowStock = (dashboardQuery.data?.lowStockItems ?? [])
       .filter((product) => product.stockQuantity <= product.lowStockThreshold)
       .slice(0, 3)
       .map((product) => ({
@@ -55,17 +52,17 @@ export function Topbar() {
         title: `${product.name} is low`,
         detail: `${product.stockQuantity} left / threshold ${product.lowStockThreshold}`
       }));
-    const latestOrder = ordersQuery.data?.[0]
+    const latestOrder = dashboardQuery.data?.recentOrders[0]
       ? [
           {
-            id: `order-${ordersQuery.data[0].id}`,
+            id: `order-${dashboardQuery.data.recentOrders[0].id}`,
             icon: ReceiptText,
-            title: `Order ${ordersQuery.data[0].orderNumber} completed`,
-            detail: `${ordersQuery.data[0].cashierName} / ${ordersQuery.data[0].paymentMethod.toUpperCase()}`
+            title: `Order ${dashboardQuery.data.recentOrders[0].orderNumber} completed`,
+            detail: `${dashboardQuery.data.recentOrders[0].cashierName} / ${dashboardQuery.data.recentOrders[0].paymentMethod.toUpperCase()}`
           }
         ]
       : [];
-    const promoReminder = (discountsQuery.data ?? []).some((discount) => discount.scope === "promo")
+    const promoReminder = (discountsQuery.data?.data ?? []).some((discount) => discount.scope === "promo")
       ? [
           {
             id: "promo-reminder",
@@ -77,7 +74,7 @@ export function Topbar() {
       : [];
 
     return [...lowStock, ...latestOrder, ...promoReminder];
-  }, [clearedNotifications, discountsQuery.data, ordersQuery.data, productsQuery.data]);
+  }, [clearedNotifications, dashboardQuery.data, discountsQuery.data]);
 
   const initials =
     user?.name

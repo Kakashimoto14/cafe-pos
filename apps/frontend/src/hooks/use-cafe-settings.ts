@@ -1,10 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/services/api-client";
+import { appQueryOptions } from "@/lib/app-queries";
 
 export function useCafeSettings() {
-  return useQuery({
-    queryKey: ["business-settings"],
-    queryFn: () => apiClient.businessSettings(),
-    staleTime: 60_000
-  });
+  return useQuery(appQueryOptions.settings());
 }

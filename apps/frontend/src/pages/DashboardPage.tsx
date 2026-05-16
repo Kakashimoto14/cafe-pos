@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Coffee, ReceiptText, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiClient } from "@/services/api-client";
+import { PageErrorState, SectionCardSkeleton, StatCardsSkeleton } from "@/components/ui/page-states";
+import { appQueryOptions } from "@/lib/app-queries";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-PH", {
@@ -12,17 +13,26 @@ function formatMoney(value: number) {
 }
 
 export function DashboardPage() {
-  const summaryQuery = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: () => apiClient.dashboardSummary()
-  });
+  const summaryQuery = useQuery(appQueryOptions.dashboard());
 
   if (summaryQuery.isLoading) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading live dashboard...</Card>;
+    return (
+      <div className="space-y-6">
+        <section className="rounded-[32px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-6 shadow-[0_22px_48px_rgba(74,43,24,0.08)]">
+          <div className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8f7767]">Cozy Cafe POS</div>
+          <div className="mt-3 h-10 w-40 rounded-[18px] bg-[#f0e4d6]" />
+        </section>
+        <StatCardsSkeleton />
+        <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+          <SectionCardSkeleton rows={4} />
+          <SectionCardSkeleton rows={4} />
+        </section>
+      </div>
+    );
   }
 
   if (summaryQuery.isError) {
-    return <Card className="p-6 text-sm text-rose-500">{summaryQuery.error.message}</Card>;
+    return <PageErrorState title="Dashboard unavailable" message={summaryQuery.error.message} onRetry={() => void summaryQuery.refetch()} />;
   }
 
   const summary = summaryQuery.data;

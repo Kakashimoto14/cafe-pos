@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BadgePercent, PlusCircle } from "lucide-react";
+import { BadgePercent, PlusCircle, Search, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import type { AppRole, DiscountFormValues } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PaginationControls, PageEmptyState, PageErrorState, SectionCardSkeleton } from "@/components/ui/page-states";
+import { appQueryOptions } from "@/lib/app-queries";
 import { apiClient } from "@/services/api-client";
 
 const discountSchema = z.object({
@@ -39,12 +41,24 @@ const emptyDiscount: DiscountFormValues = {
 
 export function DiscountsPage() {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [editorOpen, setEditorOpen] = useState(false);
+  const limit = 12;
 
-  const discountsQuery = useQuery({
-    queryKey: ["discounts", "all"],
-    queryFn: () => apiClient.discounts()
-  });
+  useEffect(() => {
+    setPage(1);
+  }, [deferredQuery]);
+
+  const discountsQuery = useQuery(
+    appQueryOptions.discounts({
+      page,
+      limit,
+      search: deferredQuery.trim() || undefined,
+      activeOnly: false
+    })
+  );
 
   const discountForm = useForm<DiscountFormValues>({
     resolver: zodResolver(discountSchema),
@@ -76,7 +90,15 @@ export function DiscountsPage() {
     }
   }, [discountForm, editorOpen]);
 
-  const discounts = discountsQuery.data ?? [];
+  const discounts = discountsQuery.data?.data ?? [];
+
+  if (discountsQuery.isLoading && discounts.length === 0) {
+    return <SectionCardSkeleton rows={4} />;
+  }
+
+  if (discountsQuery.isError) {
+    return <PageErrorState title="Discounts unavailable" message={discountsQuery.error.message} onRetry={() => void discountsQuery.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -98,9 +120,36 @@ export function DiscountsPage() {
         </div>
       </section>
 
+      <Card className="flex items-center gap-3 border-[#eadbcb] bg-white px-4 py-3">
+        <Search className="h-5 w-5 text-[#9a8170]" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search discount code, name, or description"
+          className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+        />
+        {query ? (
+          <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </Card>
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {discountsQuery.isLoading ? <Card className="p-6 text-sm text-[#7b685c]">Loading discounts...</Card> : null}
-        {discountsQuery.isError ? <Card className="p-6 text-sm text-rose-500">{discountsQuery.error.message}</Card> : null}
+        {discountsQuery.isFetching && discounts.length > 0 ? <div className="col-span-full text-sm text-[#8f7767]">Refreshing discount rules...</div> : null}
+        {discounts.length === 0 ? (
+          <div className="col-span-full">
+            <PageEmptyState
+              icon={<BadgePercent className="h-8 w-8" />}
+              title="No discounts found"
+              description={
+                deferredQuery.trim()
+                  ? "Try another discount code, rule name, or description."
+                  : "Create your first discount to make promos and manual adjustments available at checkout."
+              }
+            />
+          </div>
+        ) : null}
         {discounts.map((discount) => (
           <Card key={discount.id} className="border-[#eadbcb] bg-white p-5">
             <div className="flex items-start justify-between gap-3">
@@ -163,6 +212,13 @@ export function DiscountsPage() {
           </Card>
         ))}
       </section>
+
+      <PaginationControls
+        page={discountsQuery.data?.meta.page ?? page}
+        totalPages={discountsQuery.data?.meta.totalPages ?? 0}
+        label={discountsQuery.data ? `${discountsQuery.data.meta.total} total discounts` : undefined}
+        onPageChange={setPage}
+      />
 
       {editorOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">

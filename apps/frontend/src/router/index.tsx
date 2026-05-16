@@ -1,52 +1,53 @@
 import { lazy } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import { routeImporters } from "@/lib/route-preload";
 import { AppShell } from "@/layouts/AppShell";
 import { RequireAuth } from "@/router/RequireAuth";
 import { RequireRole } from "@/router/RequireRole";
 import { RouteErrorBoundary } from "@/router/RouteErrorBoundary";
 
 const DashboardPage = lazy(async () => ({
-  default: (await import("@/pages/DashboardPage")).DashboardPage
+  default: (await routeImporters["/"]()).DashboardPage
 }));
 
 const LoginPage = lazy(async () => ({
-  default: (await import("@/pages/LoginPage")).LoginPage
+  default: (await routeImporters["/login"]()).LoginPage
 }));
 
 const PosPage = lazy(async () => ({
-  default: (await import("@/pages/PosPage")).PosPage
+  default: (await routeImporters["/pos"]()).PosPage
 }));
 
 const ProductsPage = lazy(async () => ({
-  default: (await import("@/pages/ProductsPage")).ProductsPage
+  default: (await routeImporters["/products"]()).ProductsPage
 }));
 
 const OrdersPage = lazy(async () => ({
-  default: (await import("@/pages/OrdersPage")).OrdersPage
+  default: (await routeImporters["/orders"]()).OrdersPage
 }));
 
 const InventoryPage = lazy(async () => ({
-  default: (await import("@/pages/InventoryPage")).InventoryPage
+  default: (await routeImporters["/inventory"]()).InventoryPage
 }));
 
 const SalesPage = lazy(async () => ({
-  default: (await import("@/pages/SalesPage")).SalesPage
+  default: (await routeImporters["/sales"]()).SalesPage
 }));
 
 const DiscountsPage = lazy(async () => ({
-  default: (await import("@/pages/DiscountsPage")).DiscountsPage
+  default: (await routeImporters["/discounts"]()).DiscountsPage
 }));
 
 const TeamPage = lazy(async () => ({
-  default: (await import("@/pages/TeamPage")).TeamPage
+  default: (await routeImporters["/team"]()).TeamPage
 }));
 
 const ReceiptPage = lazy(async () => ({
-  default: (await import("@/pages/ReceiptPage")).ReceiptPage
+  default: (await routeImporters["/receipt"]()).ReceiptPage
 }));
 
 const SettingsPage = lazy(async () => ({
-  default: (await import("@/pages/SettingsPage")).SettingsPage
+  default: (await routeImporters["/settings"]()).SettingsPage
 }));
 
 export const router = createBrowserRouter([

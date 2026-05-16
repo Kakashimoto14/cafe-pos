@@ -1,10 +1,14 @@
-import { type PropsWithChildren, useEffect } from "react";
+import { type PropsWithChildren, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { prefetchPostLoginData } from "@/lib/app-queries";
 import { apiClient } from "@/services/api-client";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function AuthBootstrap({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
+  const prefetchedUserIdRef = useRef<string | null>(null);
   const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
   const setInitialized = useAuthStore((state) => state.setInitialized);
@@ -22,7 +26,12 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
 
         if (result.session && result.user) {
           setSession(result.session, result.user);
+          if (prefetchedUserIdRef.current !== result.user.id) {
+            prefetchedUserIdRef.current = result.user.id;
+            prefetchPostLoginData(queryClient);
+          }
         } else {
+          prefetchedUserIdRef.current = null;
           clearSession();
         }
       } catch (error) {
@@ -52,7 +61,12 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
             }
 
             setSession(session, user);
+            if (prefetchedUserIdRef.current !== user.id) {
+              prefetchedUserIdRef.current = user.id;
+              prefetchPostLoginData(queryClient);
+            }
           } else if (isMounted) {
+            prefetchedUserIdRef.current = null;
             clearSession();
           }
         } catch (error) {
@@ -72,7 +86,7 @@ export function AuthBootstrap({ children }: PropsWithChildren) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [clearSession, setInitialized, setSession]);
+  }, [clearSession, queryClient, setInitialized, setSession]);
 
   return children;
 }

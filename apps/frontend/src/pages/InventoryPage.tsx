@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Beaker, Download, History, PackagePlus, Printer, Search, SlidersHorizontal, X } from "lucide-react";
 import type { IngredientAdjustmentType, IngredientFormValues, ProductAddonFormValues } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PaginationControls, PageEmptyState, PageErrorState } from "@/components/ui/page-states";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCafeSettings } from "@/hooks/use-cafe-settings";
 import { downloadInventoryReportCsv, formatReportMoney } from "@/lib/reporting";
 import { apiClient } from "@/services/api-client";
@@ -51,7 +53,10 @@ export function InventoryPage() {
   const settingsQuery = useCafeSettings();
   const user = useAuthStore((state) => state.user);
   const canEdit = canManageInventory(user?.role);
+  const pageSize = 20;
   const [activeTab, setActiveTab] = useState<InventoryTab>("ingredients");
+  const [ingredientPage, setIngredientPage] = useState(1);
+  const [movementPage, setMovementPage] = useState(1);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -85,35 +90,38 @@ export function InventoryPage() {
 
   const productsQuery = useQuery({
     queryKey: ["products", "all"],
-    queryFn: () => apiClient.products()
+    queryFn: () => apiClient.products(),
+    enabled: activeTab === "recipes" || activeTab === "addons"
   });
 
   const movementsQuery = useQuery({
     queryKey: ["ingredient-adjustments"],
-    queryFn: () => apiClient.ingredientAdjustments()
+    queryFn: () => apiClient.ingredientAdjustments(),
+    enabled: activeTab === "movement"
   });
 
   const addonsQuery = useQuery({
     queryKey: ["product-addons", "all"],
-    queryFn: () => apiClient.productAddons()
+    queryFn: () => apiClient.productAddons(),
+    enabled: activeTab === "addons"
   });
 
   const recipeQuery = useQuery({
     queryKey: ["product-ingredients", selectedProductId],
     queryFn: () => apiClient.productIngredients(selectedProductId),
-    enabled: Boolean(selectedProductId)
+    enabled: activeTab === "recipes" && Boolean(selectedProductId)
   });
 
   const addonIngredientsQuery = useQuery({
     queryKey: ["addon-ingredients", selectedAddonId],
     queryFn: () => apiClient.addonIngredients(selectedAddonId),
-    enabled: Boolean(selectedAddonId)
+    enabled: activeTab === "addons" && Boolean(selectedAddonId)
   });
 
   const addonLinksQuery = useQuery({
     queryKey: ["product-addon-links", selectedProductId],
     queryFn: () => apiClient.productAddonLinks(selectedProductId),
-    enabled: Boolean(selectedProductId)
+    enabled: activeTab === "addons" && Boolean(selectedProductId)
   });
 
   const ingredients = ingredientsQuery.data ?? [];
@@ -139,6 +147,16 @@ export function InventoryPage() {
     });
   }, [categoryFilter, ingredients, query, statusFilter]);
 
+  useEffect(() => {
+    setIngredientPage(1);
+  }, [categoryFilter, query, statusFilter]);
+
+  useEffect(() => {
+    if (activeTab !== "movement") {
+      setMovementPage(1);
+    }
+  }, [activeTab]);
+
   const lowStockIngredients = ingredients.filter(
     (ingredient) => ingredient.isActive && ingredient.quantityOnHand <= ingredient.lowStockThreshold
   );
@@ -147,6 +165,11 @@ export function InventoryPage() {
   const totalIngredientUnits = ingredients.reduce((sum, ingredient) => sum + ingredient.quantityOnHand, 0);
   const totalInventoryValue = ingredients.reduce((sum, ingredient) => sum + ingredient.quantityOnHand * ingredient.costPerUnit, 0);
   const productsWithRecipes = products.filter((product) => product.hasRecipe).length;
+  const pagedIngredients = filteredIngredients.slice((ingredientPage - 1) * pageSize, ingredientPage * pageSize);
+  const ingredientTotalPages = Math.ceil(filteredIngredients.length / pageSize);
+  const movementRows = movementsQuery.data ?? [];
+  const pagedMovements = movementRows.slice((movementPage - 1) * pageSize, movementPage * pageSize);
+  const movementTotalPages = Math.ceil(movementRows.length / pageSize);
   const inventoryByCategory = ingredientCategories
     .map((category) => {
       const categoryItems = filteredIngredients.filter((ingredient) => ingredient.category === category);
@@ -328,7 +351,7 @@ export function InventoryPage() {
             </Card>
             <Card className="border-[#eadbcb] bg-white px-4 py-4">
               <div className="text-sm text-[#7b685c]">Products with recipes</div>
-              <div className="mt-2 text-2xl font-semibold text-[#241610]">{productsWithRecipes}</div>
+              <div className="mt-2 text-2xl font-semibold text-[#241610]">{productsQuery.isLoading ? "--" : productsWithRecipes}</div>
             </Card>
             <Card className="border-[#eadbcb] bg-white px-4 py-4">
               <div className="text-sm text-[#7b685c]">Estimated value</div>
@@ -491,14 +514,29 @@ export function InventoryPage() {
           </div>
 
           <div className="mt-5 grid gap-3">
-            {ingredientsQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading ingredients...</div> : null}
-            {ingredientsQuery.isError ? <div className="text-sm text-rose-500">{ingredientsQuery.error.message}</div> : null}
-            {filteredIngredients.length === 0 && !ingredientsQuery.isLoading && !ingredientsQuery.isError ? (
-              <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-6 text-sm text-[#7b685c]">
-                No ingredients match the current search and filters.
-              </div>
+            {ingredientsQuery.isLoading
+              ? Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="mt-3 h-4 w-40" />
+                    <Skeleton className="mt-4 h-10 w-full" />
+                  </div>
+                ))
+              : null}
+            {ingredientsQuery.isError ? (
+              <PageErrorState
+                title="Inventory unavailable"
+                message={ingredientsQuery.error.message}
+                onRetry={() => void ingredientsQuery.refetch()}
+              />
             ) : null}
-            {filteredIngredients.map((ingredient) => {
+            {filteredIngredients.length === 0 && !ingredientsQuery.isLoading && !ingredientsQuery.isError ? (
+              <PageEmptyState
+                title="No ingredients found"
+                description="No ingredients match the current search and filters."
+              />
+            ) : null}
+            {pagedIngredients.map((ingredient) => {
               const status = !ingredient.isActive ? "Inactive" : ingredient.quantityOnHand <= ingredient.lowStockThreshold ? "Low stock" : "Healthy";
 
               return (
@@ -560,6 +598,13 @@ export function InventoryPage() {
                 </div>
               );
             })}
+
+            <PaginationControls
+              page={ingredientPage}
+              totalPages={ingredientTotalPages}
+              label={`${filteredIngredients.length} filtered ingredients`}
+              onPageChange={setIngredientPage}
+            />
           </div>
           <div className="mt-5 hidden text-center text-xs uppercase tracking-[0.18em] text-[#8f7767] print:block">
             Inventory report generated on {new Date().toLocaleString("en-PH")}
@@ -662,15 +707,30 @@ export function InventoryPage() {
               </div>
             </div>
             <div className="mt-5 rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4 xl:min-h-0 xl:flex-1">
-              {movementsQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading history...</div> : null}
-              {movementsQuery.isError ? <div className="text-sm text-rose-500">{movementsQuery.error.message}</div> : null}
-              {movementsQuery.data?.length === 0 && !movementsQuery.isLoading && !movementsQuery.isError ? (
-                <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-white p-6 text-sm text-[#7b685c]">
-                  Movement history is empty. The next stock adjustment or ingredient sale deduction will appear here.
-                </div>
+              {movementsQuery.isLoading
+                ? Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="mb-3 rounded-[24px] border border-[#eadbcb] bg-white p-4">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="mt-3 h-4 w-40" />
+                      <Skeleton className="mt-4 h-6 w-full" />
+                    </div>
+                  ))
+                : null}
+              {movementsQuery.isError ? (
+                <PageErrorState
+                  title="Movement history unavailable"
+                  message={movementsQuery.error.message}
+                  onRetry={() => void movementsQuery.refetch()}
+                />
+              ) : null}
+              {movementRows.length === 0 && !movementsQuery.isLoading && !movementsQuery.isError ? (
+                <PageEmptyState
+                  title="No stock movement yet"
+                  description="The next stock adjustment or ingredient sale deduction will appear here."
+                />
               ) : null}
               <div className="space-y-3 xl:max-h-[560px] xl:overflow-y-auto xl:pr-1">
-                {(movementsQuery.data ?? []).map((movement) => (
+                {pagedMovements.map((movement) => (
                   <div key={movement.id} className="rounded-[24px] border border-[#eadbcb] bg-white p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
@@ -703,6 +763,15 @@ export function InventoryPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4">
+                <PaginationControls
+                  page={movementPage}
+                  totalPages={movementTotalPages}
+                  label={`${movementRows.length} stock movements`}
+                  onPageChange={setMovementPage}
+                />
               </div>
             </div>
           </Card>

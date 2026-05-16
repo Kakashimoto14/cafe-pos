@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck, UserCog, UserPlus } from "lucide-react";
+import { Search, ShieldCheck, UserCog, UserPlus, Users2, X } from "lucide-react";
 import type { AppRole } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PaginationControls, PageEmptyState, PageErrorState, SectionCardSkeleton } from "@/components/ui/page-states";
+import { appQueryOptions } from "@/lib/app-queries";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -13,19 +15,31 @@ const roles: AppRole[] = ["admin", "manager", "cashier"];
 export function TeamPage() {
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({ fullName: "", email: "", role: "cashier" as AppRole, temporaryPassword: "" });
-  const teamQuery = useQuery({
-    queryKey: ["profiles"],
-    queryFn: () => apiClient.listProfiles()
-  });
+  const limit = 10;
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredQuery]);
+
+  const teamQuery = useQuery(
+    appQueryOptions.team({
+      page,
+      limit,
+      search: deferredQuery.trim() || undefined
+    })
+  );
 
   const updateMutation = useMutation({
     mutationFn: ({ id, role, isActive }: { id: string; role?: AppRole; isActive?: boolean }) =>
       apiClient.updateProfile(id, { role, isActive }),
     onSuccess: () => {
       toast.success("Team access updated.");
-      void queryClient.invalidateQueries({ queryKey: ["profiles"] });
+      void queryClient.invalidateQueries({ queryKey: ["team"] });
     },
     onError: (error) => toast.error(error.message)
   });
@@ -36,20 +50,20 @@ export function TeamPage() {
       toast.success("User created.");
       setAddUserOpen(false);
       setNewUser({ fullName: "", email: "", role: "cashier", temporaryPassword: "" });
-      void queryClient.invalidateQueries({ queryKey: ["profiles"] });
+      void queryClient.invalidateQueries({ queryKey: ["team"] });
     },
     onError: (error) => toast.error(error.message)
   });
 
-  if (teamQuery.isLoading) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading operator accounts...</Card>;
+  const profiles = teamQuery.data?.data ?? [];
+
+  if (teamQuery.isLoading && profiles.length === 0) {
+    return <SectionCardSkeleton rows={4} />;
   }
 
   if (teamQuery.isError) {
-    return <Card className="p-6 text-sm text-rose-500">{teamQuery.error.message}</Card>;
+    return <PageErrorState title="Team unavailable" message={teamQuery.error.message} onRetry={() => void teamQuery.refetch()} />;
   }
-
-  const profiles = teamQuery.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -65,6 +79,31 @@ export function TeamPage() {
           </Button>
         ) : null}
       </section>
+
+      <Card className="flex items-center gap-3 border-[#eadbcb] bg-white px-4 py-3">
+        <Search className="h-5 w-5 text-[#9a8170]" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search name, email, or role"
+          className="w-full border-0 bg-transparent p-0 text-sm outline-none"
+        />
+        {query ? (
+          <button type="button" onClick={() => setQuery("")} className="rounded-full p-1 text-[#8f7767] hover:bg-[#f6eee5]">
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </Card>
+
+      {teamQuery.isFetching && profiles.length > 0 ? <div className="text-sm text-[#8f7767]">Refreshing operator accounts...</div> : null}
+
+      {profiles.length === 0 ? (
+        <PageEmptyState
+          icon={<Users2 className="h-8 w-8" />}
+          title="No team members found"
+          description={deferredQuery.trim() ? "Try another name, email, or role." : "Create a staff account to manage operator access from this screen."}
+        />
+      ) : null}
 
       <div className="grid gap-4">
         {profiles.map((profile) => (
@@ -116,6 +155,13 @@ export function TeamPage() {
           </Card>
         ))}
       </div>
+
+      <PaginationControls
+        page={teamQuery.data?.meta.page ?? page}
+        totalPages={teamQuery.data?.meta.totalPages ?? 0}
+        label={teamQuery.data ? `${teamQuery.data.meta.total} team members` : undefined}
+        onPageChange={setPage}
+      />
 
       {addUserOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#3b2418]/30 p-4">

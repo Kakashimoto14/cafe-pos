@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ReceiptDocument } from "@/components/sales/ReceiptDocument";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageErrorState, SectionCardSkeleton } from "@/components/ui/page-states";
 import { useCafeSettings } from "@/hooks/use-cafe-settings";
 import { DEFAULT_CAFE_SETTINGS, formatOrderChannelLabel, normalizeCafeSettingsInput, validateCafeSettings } from "@/lib/cafe-settings";
 import { createSampleReceiptData } from "@/lib/receipt";
@@ -93,7 +94,7 @@ export function SettingsPage() {
     mutationFn: (values: CafeSettings) => apiClient.saveBusinessSettings(values),
     onSuccess: (savedSettings) => {
       setSettings(savedSettings);
-      void queryClient.invalidateQueries({ queryKey: ["business-settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Receipt and business settings saved.");
     },
     onError: (error) => {
@@ -146,7 +147,7 @@ export function SettingsPage() {
   };
 
   if (settingsQuery.isLoading && !hydrated) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading receipt and business settings...</Card>;
+    return <SectionCardSkeleton rows={5} />;
   }
 
   return (
@@ -173,9 +174,11 @@ export function SettingsPage() {
       </section>
 
       {settingsQuery.isError ? (
-        <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-600">
-          {settingsQuery.error.message} The form is still available with safe fallback values, but the latest business settings could not be loaded from Supabase.
-        </Card>
+        <PageErrorState
+          title="Using fallback settings"
+          message={`${settingsQuery.error.message} The form is still available with safe fallback values, but the latest business settings could not be loaded from Supabase.`}
+          onRetry={() => void settingsQuery.refetch()}
+        />
       ) : null}
 
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_360px]">

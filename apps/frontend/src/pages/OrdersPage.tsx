@@ -1,8 +1,9 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ReceiptText, Search, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { apiClient } from "@/services/api-client";
+import { PaginationControls, PageEmptyState, PageErrorState, SectionCardSkeleton } from "@/components/ui/page-states";
+import { appQueryOptions, DEFAULT_ORDERS_PAGE_SIZE } from "@/lib/app-queries";
 
 function formatMoney(value: number, currency = "PHP") {
   try {
@@ -21,44 +22,37 @@ function formatMoney(value: number, currency = "PHP") {
 }
 
 export function OrdersPage() {
+  const [page, setPage] = useState(1);
+  const limit = DEFAULT_ORDERS_PAGE_SIZE;
   const [query, setQuery] = useState("");
-  const deferredQuery = useDeferredValue(query);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const ordersQuery = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => apiClient.listOrders()
-  });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [query]);
 
-  const orders = ordersQuery.data ?? [];
-  const filteredOrders = useMemo(() => {
-    const normalized = deferredQuery.trim().toLowerCase();
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
 
-    if (!normalized) {
-      return orders;
-    }
+  const ordersQuery = useQuery(
+    appQueryOptions.orders({
+      page,
+      limit,
+      search: debouncedQuery || undefined
+    })
+  );
 
-    return orders.filter((order) =>
-      [
-        order.orderNumber,
-        order.orderType.replace("_", " "),
-        order.paymentMethod,
-        order.cashierName,
-        order.paymentReference ?? "",
-        order.notes ?? "",
-        ...order.items.map((item) => item.productName)
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized)
-    );
-  }, [deferredQuery, orders]);
+  const orders = ordersQuery.data?.data ?? [];
+  const meta = ordersQuery.data?.meta;
 
-  if (ordersQuery.isLoading) {
-    return <Card className="p-6 text-sm text-[#7b685c]">Loading recent tickets...</Card>;
+  if (ordersQuery.isLoading && orders.length === 0) {
+    return <SectionCardSkeleton rows={4} />;
   }
 
   if (ordersQuery.isError) {
-    return <Card className="p-6 text-sm text-rose-500">{ordersQuery.error.message}</Card>;
+    return <PageErrorState title="Orders unavailable" message={ordersQuery.error.message} onRetry={() => void ordersQuery.refetch()} />;
   }
 
   return (
@@ -73,7 +67,7 @@ export function OrdersPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search order, payment, cashier, or item"
+            placeholder="Search order, queue, payment, email, reference, or note"
             className="w-full border-0 bg-transparent p-0 text-sm outline-none"
           />
           {query ? (
@@ -84,25 +78,23 @@ export function OrdersPage() {
         </div>
       </section>
 
+      {ordersQuery.isFetching && orders.length > 0 ? (
+        <div className="text-sm text-[#8f7767]">Refreshing recent tickets in the background...</div>
+      ) : null}
+
       {orders.length === 0 ? (
-        <Card className="grid min-h-72 place-items-center p-6 text-center">
-          <div>
-            <ReceiptText className="mx-auto h-8 w-8 text-[#b38d72]" />
-            <h2 className="mt-4 text-xl font-semibold text-[#241610]">No orders yet</h2>
-            <p className="mt-2 text-sm text-[#7b685c]">Orders created from the POS screen will appear here immediately.</p>
-          </div>
-        </Card>
-      ) : filteredOrders.length === 0 ? (
-        <Card className="grid min-h-72 place-items-center p-6 text-center">
-          <div>
-            <ReceiptText className="mx-auto h-8 w-8 text-[#b38d72]" />
-            <h2 className="mt-4 text-xl font-semibold text-[#241610]">No orders found</h2>
-            <p className="mt-2 text-sm text-[#7b685c]">Try another order number, cashier, payment method, or item name.</p>
-          </div>
-        </Card>
+        <PageEmptyState
+          icon={<ReceiptText className="h-8 w-8" />}
+          title={debouncedQuery ? "No matching orders found." : "No orders yet"}
+          description={
+            debouncedQuery
+              ? "Try another order number, queue number, payment method, customer email, payment reference, or note."
+              : "Orders created from the POS screen will appear here immediately."
+          }
+        />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
-          {filteredOrders.map((order) => (
+          {orders.map((order) => (
             <Card key={order.id} className="border-[#eadbcb] bg-white p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -117,36 +109,30 @@ export function OrdersPage() {
                 </div>
                 <div className="rounded-2xl border border-[#eadbcb] bg-[#fffaf4] px-4 py-3 text-right text-[#241610]">
                   <div className="text-xs uppercase tracking-[0.2em] text-[#8f7767]">{order.paymentMethod}</div>
-                  <div className="mt-1 text-lg font-semibold">{formatMoney(order.grandTotal, order.receiptSettings?.currency)}</div>
+                  <div className="mt-1 text-lg font-semibold">{formatMoney(order.grandTotal)}</div>
                 </div>
               </div>
 
               <div className="mt-5 space-y-3 rounded-3xl border border-[#f0e4d6] bg-[#fffaf4] p-4">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between gap-3 text-sm">
-                    <div>
-                      <div className="font-medium text-[#241610]">{item.productName}</div>
-                      <div className="text-[#7b685c]">Qty {item.quantity}</div>
-                      {item.addons && item.addons.length > 0 ? (
-                        <div className="mt-1 space-y-0.5 text-xs text-[#7b685c]">
-                          {item.addons.map((addon) => (
-                            <div key={addon.id}>
-                              + {addon.addonName}
-                              {addon.quantity > 1 ? ` x${addon.quantity}` : ""}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                {order.items.length === 0 ? (
+                  <div className="text-sm text-[#7b685c]">No line items were recorded for this order.</div>
+                ) : (
+                  order.items.map((item) => (
+                    <div key={item.id} className="flex items-start justify-between gap-3 text-sm">
+                      <div>
+                        <div className="font-medium text-[#241610]">{item.productName}</div>
+                        <div className="text-[#7b685c]">Qty {item.quantity}</div>
+                      </div>
+                      <div className="text-right text-[#6c584b]">{formatMoney(item.lineTotal)}</div>
                     </div>
-                    <div className="text-right text-[#6c584b]">{formatMoney(item.lineTotal, order.receiptSettings?.currency)}</div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
 
               <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#7b685c]">
                 {order.discountTotal > 0 ? (
                   <span>
-                    Discount: {order.discountLabel ?? order.discountCode ?? "Applied"} ({formatMoney(order.discountTotal, order.receiptSettings?.currency)})
+                    Discount: Applied ({formatMoney(order.discountTotal)})
                   </span>
                 ) : null}
                 {order.paymentReference ? <span>Reference: {order.paymentReference}</span> : null}
@@ -167,6 +153,13 @@ export function OrdersPage() {
           ))}
         </div>
       )}
+
+      <PaginationControls
+        page={meta?.page ?? page}
+        totalPages={meta?.totalPages ?? 0}
+        label={meta ? `Page ${meta.page}${meta.totalPages > meta.page ? " / more available" : ""}` : undefined}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

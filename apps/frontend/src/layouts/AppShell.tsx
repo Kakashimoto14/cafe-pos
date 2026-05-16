@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function AppShell() {
   return (
@@ -15,8 +16,18 @@ export function AppShell() {
           <div className="flex-1 p-4 pb-24 md:p-6 md:pb-24 xl:p-8 xl:pb-8 print:p-0">
             <Suspense
               fallback={
-                <Card className="p-6">
-                  <div className="text-sm text-[#7b685c]">Loading your cafe workspace...</div>
+                <Card className="border-[#eadbcb] bg-white p-6">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="mt-4 h-8 w-60" />
+                  <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                      <div key={index} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="mt-3 h-6 w-40" />
+                        <Skeleton className="mt-4 h-20 w-full" />
+                      </div>
+                    ))}
+                  </div>
                 </Card>
               }
             >

@@ -8,6 +8,9 @@ import type { CategoryFormValues, ProductFormValues } from "@cafe/shared-types";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PaginationControls, PageEmptyState, PageErrorState } from "@/components/ui/page-states";
+import { Skeleton } from "@/components/ui/skeleton";
+import { appQueryOptions } from "@/lib/app-queries";
 import { ProductImage } from "@/components/products/ProductImage";
 import { apiClient } from "@/services/api-client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -63,20 +66,29 @@ const emptyCategory: CategoryFormValues = {
 export function ProductsPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
+  const [page, setPage] = useState(1);
   const [productEditorOpen, setProductEditorOpen] = useState(false);
   const [categoryEditorOpen, setCategoryEditorOpen] = useState(false);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+  const limit = 12;
 
   const categoriesQuery = useQuery({
     queryKey: ["categories", "all"],
     queryFn: () => apiClient.categories()
   });
 
-  const productsQuery = useQuery({
-    queryKey: ["products", "all"],
-    queryFn: () => apiClient.products()
-  });
+  useEffect(() => {
+    setPage(1);
+  }, [deferredQuery]);
+
+  const productsQuery = useQuery(
+    appQueryOptions.products({
+      page,
+      limit,
+      search: deferredQuery.trim() || undefined
+    })
+  );
 
   const canEdit = canManageCatalog(user?.role);
 
@@ -146,18 +158,56 @@ export function ProductsPage() {
   }, [categoryEditorOpen, categoryForm]);
 
   const categories = categoriesQuery.data ?? [];
-  const products = productsQuery.data ?? [];
-  const filteredProducts = useMemo(() => {
-    const normalized = deferredQuery.trim().toLowerCase();
+  const products = productsQuery.data?.data ?? [];
+  const filteredProducts = useMemo(() => products, [products]);
 
-    if (!normalized) {
-      return products;
-    }
+  if (productsQuery.isLoading && products.length === 0) {
+    return (
+      <div className="space-y-6">
+        <section className="rounded-[28px] border border-[#eadbcb] bg-[linear-gradient(135deg,#fffdf9,#f6eee5)] p-5 shadow-[0_18px_38px_rgba(74,43,24,0.07)]">
+          <div className="h-4 w-20 rounded-[18px] bg-[#eadccc]" />
+          <div className="mt-4 h-10 w-56 rounded-[18px] bg-[#f0e4d6]" />
+        </section>
 
-    return products.filter((product) =>
-      `${product.name} ${product.sku} ${product.category} ${product.description}`.toLowerCase().includes(normalized)
+        <section className="grid gap-6 xl:grid-cols-[320px_1fr]">
+          <Card className="border-[#eadbcb] bg-white p-5">
+            <Skeleton className="h-4 w-24" />
+            <div className="mt-4 space-y-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="mt-3 h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="space-y-4">
+            <Card className="border-[#eadbcb] bg-white px-4 py-3">
+              <Skeleton className="h-10 w-full" />
+            </Card>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="overflow-hidden border-[#eadbcb] bg-white">
+                  <Skeleton className="aspect-[16/10] w-full rounded-none" />
+                  <div className="space-y-3 p-5">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
     );
-  }, [deferredQuery, products]);
+  }
+
+  if (productsQuery.isError) {
+    return <PageErrorState title="Products unavailable" message={productsQuery.error.message} onRetry={() => void productsQuery.refetch()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -200,7 +250,14 @@ export function ProductsPage() {
         <Card className="border-[#eadbcb] bg-white p-5 xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8f7767]">Categories</div>
           <div className="mt-4 space-y-3">
-            {categoriesQuery.isLoading ? <div className="text-sm text-[#7b685c]">Loading categories...</div> : null}
+            {categoriesQuery.isLoading
+              ? Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="rounded-[24px] border border-[#f0e4d6] bg-[#fffaf4] p-4">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="mt-3 h-4 w-16" />
+                  </div>
+                ))
+              : null}
             {categoriesQuery.isError ? <div className="text-sm text-rose-500">{categoriesQuery.error.message}</div> : null}
             {categories.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-[#d9c2ac] bg-[#fffaf4] p-5 text-sm text-[#7b685c]">
@@ -279,17 +336,18 @@ export function ProductsPage() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {productsQuery.isLoading ? <Card className="p-6 text-sm text-[#7b685c]">Loading products...</Card> : null}
-          {productsQuery.isError ? <Card className="p-6 text-sm text-rose-500">{productsQuery.error.message}</Card> : null}
-          {products.length === 0 && !productsQuery.isLoading ? (
-            <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
-              No products yet. Add your first menu item to populate the POS screen.
-            </Card>
-          ) : null}
-          {products.length > 0 && filteredProducts.length === 0 && !productsQuery.isLoading ? (
-            <Card className="col-span-full p-8 text-center text-sm text-[#7b685c]">
-              No products found. Try another product name, SKU, or category.
-            </Card>
+          {productsQuery.isFetching && products.length > 0 ? <div className="col-span-full text-sm text-[#8f7767]">Refreshing catalog...</div> : null}
+          {products.length === 0 ? (
+            <div className="col-span-full">
+              <PageEmptyState
+                title={deferredQuery.trim() ? "No products found" : "No products yet"}
+                description={
+                  deferredQuery.trim()
+                    ? "Try another product name, SKU, or description."
+                    : "Add your first menu item to populate the POS screen."
+                }
+              />
+            </div>
           ) : null}
 
           {filteredProducts.map((product) => (
@@ -383,6 +441,13 @@ export function ProductsPage() {
             </Card>
           ))}
           </div>
+
+          <PaginationControls
+            page={productsQuery.data?.meta.page ?? page}
+            totalPages={productsQuery.data?.meta.totalPages ?? 0}
+            label={productsQuery.data ? `${productsQuery.data.meta.total} total products` : undefined}
+            onPageChange={setPage}
+          />
         </div>
       </section>
 

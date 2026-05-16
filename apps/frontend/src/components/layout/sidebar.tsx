@@ -1,7 +1,9 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { BarChart3, BadgePercent, Boxes, Coffee, Package2, ReceiptText, Settings2, TrendingUp, Users2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { AppRole } from "@cafe/shared-types";
 import { BrandLogo } from "@/components/branding/BrandLogo";
+import { prefetchSidebarTarget } from "@/lib/app-queries";
 import { useAuthStore } from "@/stores/auth-store";
 import { canManageDiscounts, canManageInventory, canManageTeam, canViewSales, canViewSettings } from "@/utils/roles";
 import { cn } from "@/utils/cn";
@@ -21,6 +23,7 @@ function buildNavItems(role?: AppRole) {
 }
 
 export function Sidebar() {
+  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.user?.role);
   const items = buildNavItems(role);
@@ -43,6 +46,12 @@ export function Sidebar() {
             <NavLink
               key={to}
               to={to}
+              onMouseEnter={() => {
+                void prefetchSidebarTarget(queryClient, to, role);
+              }}
+              onFocus={() => {
+                void prefetchSidebarTarget(queryClient, to, role);
+              }}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-colors",
@@ -82,6 +91,9 @@ export function Sidebar() {
             <NavLink
               key={to}
               to={to}
+              onFocus={() => {
+                void prefetchSidebarTarget(queryClient, to, role);
+              }}
               className={({ isActive }) =>
                 cn(
                   "flex min-w-[82px] flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-semibold transition",
